@@ -675,7 +675,12 @@ body::before{content:'';position:fixed;inset:0;background:
 <div id="s3" class="sec">
   <div class="card">
     <div class="ct"><span class="ci">✏️</span> 성적 입력</div>
-    <div class="fr3" style="margin-bottom:14px;">
+    <div class="fr3" style="margin-bottom:14px;grid-template-columns:1fr 1fr 1fr 1fr;">
+      <div class="fg"><label>담당 선생님</label>
+        <select id="scoreTeacher" onchange="onScoreTeacherChange()" style="border-color:var(--pr);font-weight:700;color:var(--pr);">
+          <option value="">👨‍🏫 선생님 선택</option>
+        </select>
+      </div>
       <div class="fg"><label>학생 선택 *</label>
         <select id="scoreStudent" onchange="onScoreStudentChange()">
           <option value="">학생을 선택하세요</option>
@@ -3132,12 +3137,18 @@ function renderStudents(){
     return tMatch && gMatch;
   });
 
-  // 통계
+  // 통계 (학년별 카드): 관리자는 전체, 일반 선생님은 본인 반만
+  var myNameForStats = getMyTeacherName();
+  var statSource = myNameForStats
+    ? DB.students.filter(function(s){return s.teacher===myNameForStats;})  // 일반 선생님: 본인 반
+    : DB.students;                                                          // 관리자: 전체
   var grades = {};
-  DB.students.forEach(function(s){
+  statSource.forEach(function(s){
     var gk = GRADE_KEY_MAP[s.grade]||'기타';
     grades[gk]=(grades[gk]||0)+1;
   });
+  var statTotal = statSource.length;
+  var statLabel = myNameForStats ? '내 반' : '전체';
   var sumHtml = '';
   GRADE_LIST.forEach(function(g){
     var cnt = grades[g.key]||0;
@@ -3145,7 +3156,7 @@ function renderStudents(){
       var scClass=['','gd','wn','bd','ac','','gd','wn'][GRADE_LIST.indexOf(g)%8]||'';
       sumHtml+='<div class="sc '+scClass+'"><div class="scl">'+g.label+'</div><div class="scv" style="font-size:18px;">'+cnt+'<span style="font-size:13px;font-weight:600;">명</span></div>'
         +'<div class="prog-bar"><div class="prog-fill" style="width:'+Math.min(100,Math.round(cnt/400*100))+'%"></div></div>'
-        +'<div class="scs">전체 '+cnt+'명</div></div>';
+        +'<div class="scs">'+statLabel+' '+cnt+'명</div></div>';
     }
   });
   if(!sumHtml) sumHtml='<div style="color:var(--mu);font-size:12px;grid-column:1/-1;">등록된 학생이 없습니다</div>';
@@ -4348,12 +4359,11 @@ var currentScoreExamKey   = null;
 var currentScoreAnswers   = [];   // true=정답, false=오답
 
 function initScoreTab(){
-  // 학생 드롭다운
-  var ss = document.getElementById('scoreStudent');
-  ss.innerHTML = '<option value="">학생을 선택하세요</option>';
-  DB.students.forEach(function(s){
-    ss.innerHTML += '<option value="'+s.id+'">'+escHtml(s.name)+' ('+escHtml(s.grade)+')</option>';
-  });
+  // 선생님 드롭다운 채우기 (권한별)
+  fillScoreTeacher();
+
+  // 학생 드롭다운 (선생님 선택에 따라 채워짐)
+  fillScoreStudents();
 
   // 학년 드롭다운
   var sg = document.getElementById('scoreGradeFilter');
@@ -4370,6 +4380,77 @@ function initScoreTab(){
   currentScoreStudentId = null;
   currentScoreExamKey   = null;
   currentScoreAnswers   = [];
+}
+
+// 성적입력 선생님 드롭다운 (관리자=전체 선택 가능 / 일반=본인 고정)
+function fillScoreTeacher(){
+  var sel = document.getElementById('scoreTeacher');
+  if(!sel) return;
+  var myName = getMyTeacherName();
+  if(DB.teachers) DB.teachers.sort(function(a,b){return a.localeCompare(b,'ko');});
+
+  if(myName){
+    // 일반 선생님: 본인 고정
+    var myCnt = DB.students.filter(function(s){return s.teacher===myName;}).length;
+    sel.innerHTML = '<option value="'+escHtml(myName)+'">'+escHtml(myName)+' 선생님 ('+myCnt+'명)</option>';
+    sel.value = myName;
+    sel.disabled = true;
+    window._scoreTeacher = myName;
+  } else {
+    // 관리자: 전체 선택 가능
+    sel.disabled = false;
+    var html = '<option value="">👨‍🏫 선생님 선택</option>';
+    html += '<option value="__all__">📋 전체 학생</option>';
+    (DB.teachers||[]).forEach(function(t){
+      var cnt = DB.students.filter(function(s){return s.teacher===t;}).length;
+      html += '<option value="'+escHtml(t)+'">'+escHtml(t)+' 선생님 ('+cnt+'명)</option>';
+    });
+    var noneCnt = DB.students.filter(function(s){return !s.teacher||(DB.teachers||[]).indexOf(s.teacher)<0;}).length;
+    if(noneCnt>0) html += '<option value="__none__">❓ 담당 미지정 ('+noneCnt+'명)</option>';
+    sel.innerHTML = html;
+    // 관리자는 기본 '전체 학생'
+    if(!window._scoreTeacher) window._scoreTeacher = '__all__';
+    sel.value = window._scoreTeacher;
+  }
+}
+
+// 선생님 선택에 따라 학생 드롭다운 채우기
+function fillScoreStudents(){
+  var ss = document.getElementById('scoreStudent');
+  if(!ss) return;
+  var myName = getMyTeacherName();
+  var pick = myName ? myName : (window._scoreTeacher || '__all__');
+
+  var list = DB.students.filter(function(s){
+    if(pick==='__all__') return true;
+    if(pick==='__none__') return !s.teacher || (DB.teachers||[]).indexOf(s.teacher)<0;
+    return s.teacher===pick;
+  });
+  // 학년 순 → 이름 순 정렬
+  list.sort(function(a,b){
+    var ga=GRADE_ORDER.indexOf(GRADE_KEY_MAP[a.grade]||''), gb=GRADE_ORDER.indexOf(GRADE_KEY_MAP[b.grade]||'');
+    if(ga!==gb) return ga-gb;
+    return (a.name||'').localeCompare(b.name||'','ko');
+  });
+
+  ss.innerHTML = '<option value="">학생을 선택하세요 ('+list.length+'명)</option>';
+  list.forEach(function(s){
+    ss.innerHTML += '<option value="'+s.id+'">'+escHtml(s.name)+' ('+escHtml(s.grade)+')</option>';
+  });
+}
+
+// 관리자가 선생님을 바꿨을 때
+function onScoreTeacherChange(){
+  window._scoreTeacher = document.getElementById('scoreTeacher').value || '__all__';
+  fillScoreStudents();
+  // 선택 초기화
+  document.getElementById('scoreStudent').value = '';
+  document.getElementById('scoreGradeFilter').value = '';
+  document.getElementById('scoreExam').innerHTML = '<option value="">시험지를 선택하세요</option>';
+  document.getElementById('scorePanel').style.display = 'none';
+  document.getElementById('scoreEmpty').style.display = 'block';
+  currentScoreStudentId = null;
+  currentScoreExamKey = null;
 }
 
 function onScoreStudentChange(){
@@ -4400,7 +4481,7 @@ function onScoreGradeChange(){
 }
 
 // 학년 순서 정의
-var GRADE_ORDER = ['초5','초6','중1','중2','중3','고1','고2'];
+var GRADE_ORDER = ['초5','초6','중1','중2','중3','고1','고2','고3'];
 
 function buildScoreExamList(gradeKey){
   var sel = document.getElementById('scoreExam');
