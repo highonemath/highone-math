@@ -916,8 +916,12 @@ body::before{content:'';position:fixed;inset:0;background:
         <div class="fg"><label>학생 선택</label>
           <select id="printStudent" onchange="onPrintStudentChange()"><option value="">학생을 선택하세요</option></select>
         </div>
-        <div class="fg" style="margin-top:8px;"><label>출력할 시험 (자동 선택)</label>
-          <select id="printExam"><option value="">시험지를 선택하세요</option></select>
+        <div class="fg" style="margin-top:8px;"><label>출력할 시험 (여러 개 선택 가능)</label>
+          <div id="printExamControls" style="display:none;gap:6px;margin-bottom:6px;">
+            <button class="btn btn-sm" onclick="selectAllPrintExams()" style="padding:3px 9px;font-size:11px;">전체선택</button>
+            <button class="btn btn-sm" onclick="deselectAllPrintExams()" style="padding:3px 9px;font-size:11px;">전체해제</button>
+          </div>
+          <div id="printExamList" style="max-height:180px;overflow-y:auto;border:1px solid var(--bd);border-radius:6px;padding:8px;background:var(--bg);font-size:12px;color:var(--mu);">학생을 먼저 선택하세요</div>
         </div>
       </div>
       <div style="border:2px solid #e2e8f0;border-radius:12px;padding:16px;">
@@ -5263,14 +5267,51 @@ function runClassAnalysis(){
 // =============================================
 // === S6: 출력 — 개인/반 분석표 출력 ===
 // =============================================
+var _printSelectedExams = {}; // {examKey: true}
+
 function onPrintStudentChange(){
   var sid = document.getElementById('printStudent').value;
-  var pe  = document.getElementById('printExam');
-  pe.innerHTML = '<option value="">시험지를 선택하세요</option>';
-  if(!sid) return;
+  var box = document.getElementById('printExamList');
+  var ctrl = document.getElementById('printExamControls');
+  _printSelectedExams = {};
+  if(!sid){
+    box.innerHTML = '학생을 먼저 선택하세요';
+    if(ctrl) ctrl.style.display = 'none';
+    return;
+  }
   var allS = DB.scores[sid]||{};
-  Object.keys(allS).forEach(function(k){
-    if(DB.exams[k]) pe.innerHTML += '<option value="'+k+'">'+escHtml(EXAM_LABEL[k]||k)+'</option>';
+  var keys = Object.keys(allS).filter(function(k){return DB.exams[k];});
+  if(keys.length===0){
+    box.innerHTML = '<span style="color:var(--ng);">이 학생의 성적 데이터가 없습니다</span>';
+    if(ctrl) ctrl.style.display = 'none';
+    return;
+  }
+  // 시험 순서 정렬 (EXAM_LABEL 기준 또는 키순)
+  var html = '';
+  keys.forEach(function(k){
+    _printSelectedExams[k] = true; // 기본 전체 선택
+    html += '<label style="display:flex;align-items:center;gap:7px;padding:5px 4px;cursor:pointer;border-radius:4px;">'
+      +'<input type="checkbox" class="print-exam-chk" value="'+k+'" checked onchange="togglePrintExam(\''+k+'\')" style="width:15px;height:15px;cursor:pointer;">'
+      +'<span style="font-size:12px;color:var(--tx);">'+escHtml(EXAM_LABEL[k]||k)+'</span></label>';
+  });
+  box.innerHTML = html;
+  if(ctrl) ctrl.style.display = 'flex';
+}
+
+function togglePrintExam(k){
+  if(_printSelectedExams[k]) delete _printSelectedExams[k];
+  else _printSelectedExams[k] = true;
+}
+
+function selectAllPrintExams(){
+  document.querySelectorAll('.print-exam-chk').forEach(function(c){
+    c.checked = true; _printSelectedExams[c.value] = true;
+  });
+}
+
+function deselectAllPrintExams(){
+  document.querySelectorAll('.print-exam-chk').forEach(function(c){
+    c.checked = false; delete _printSelectedExams[c.value];
   });
 }
 
@@ -5309,10 +5350,10 @@ function printPersonalDirect(){
 // 출력 탭에서 개인 분석표 출력
 function doPrintPersonal(){
   var sid = document.getElementById('printStudent').value;
-  var ek  = document.getElementById('printExam').value;
   if(!sid){ toast('학생을 선택해주세요','ng'); return; }
-  if(!ek){  toast('시험지를 선택해주세요','ng'); return; }
-  printPersonalInNewWindow(sid, [ek]);
+  var eks = Object.keys(_printSelectedExams).filter(function(k){return _printSelectedExams[k];});
+  if(eks.length===0){ toast('출력할 시험을 1개 이상 선택해주세요','ng'); return; }
+  printPersonalInNewWindow(sid, eks);
 }
 
 // ── 출력용 유형별 정답률 바 차트 HTML (인쇄용) ──
