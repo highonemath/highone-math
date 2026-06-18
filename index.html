@@ -3142,7 +3142,7 @@ function renderStudents(){
     return tMatch && gMatch;
   });
 
-  // 통계 (학년별 카드): 관리자는 전체, 일반 선생님은 본인 반만
+  // 통계 (학년별 카드): 관리자는 전체, 일반 선생님은 본인 반 + 전체 비교
   var myNameForStats = getMyTeacherName();
   var statSource = myNameForStats
     ? DB.students.filter(function(s){return s.teacher===myNameForStats;})  // 일반 선생님: 본인 반
@@ -3152,16 +3152,32 @@ function renderStudents(){
     var gk = GRADE_KEY_MAP[s.grade]||'기타';
     grades[gk]=(grades[gk]||0)+1;
   });
+  // 학원 전체 학년별 인원 (비교용 — 항상 전체 기준)
+  var allGrades = {};
+  DB.students.forEach(function(s){
+    var gk = GRADE_KEY_MAP[s.grade]||'기타';
+    allGrades[gk]=(allGrades[gk]||0)+1;
+  });
   var statTotal = statSource.length;
-  var statLabel = myNameForStats ? '내 반' : '전체';
   var sumHtml = '';
   GRADE_LIST.forEach(function(g){
     var cnt = grades[g.key]||0;
-    if(cnt>0){
+    var allCnt = allGrades[g.key]||0;
+    // 일반 선생님: 본인 반에 학생이 있거나 전체에 있으면 표시 / 관리자: 전체에 있으면 표시
+    var showCard = myNameForStats ? (cnt>0 || allCnt>0) : (cnt>0);
+    if(showCard){
       var scClass=['','gd','wn','bd','ac','','gd','wn'][GRADE_LIST.indexOf(g)%8]||'';
+      // 작은 글씨: 일반 선생님은 "전체 M명"(학원 전체 비교), 관리자는 "전체 N명"
+      var subText = myNameForStats
+        ? ('학원 전체 '+allCnt+'명')
+        : ('전체 '+cnt+'명');
+      // 진행률 바: 일반 선생님은 전체 대비 내 반 비율, 관리자는 400 대비
+      var barPct = myNameForStats
+        ? (allCnt>0 ? Math.round(cnt/allCnt*100) : 0)
+        : Math.min(100,Math.round(cnt/400*100));
       sumHtml+='<div class="sc '+scClass+'"><div class="scl">'+g.label+'</div><div class="scv" style="font-size:18px;">'+cnt+'<span style="font-size:13px;font-weight:600;">명</span></div>'
-        +'<div class="prog-bar"><div class="prog-fill" style="width:'+Math.min(100,Math.round(cnt/400*100))+'%"></div></div>'
-        +'<div class="scs">'+statLabel+' '+cnt+'명</div></div>';
+        +'<div class="prog-bar"><div class="prog-fill" style="width:'+barPct+'%"></div></div>'
+        +'<div class="scs">'+subText+'</div></div>';
     }
   });
   if(!sumHtml) sumHtml='<div style="color:var(--mu);font-size:12px;grid-column:1/-1;">등록된 학생이 없습니다</div>';
