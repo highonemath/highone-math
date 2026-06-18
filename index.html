@@ -5348,12 +5348,58 @@ function printPersonalDirect(){
 }
 
 // 출력 탭에서 개인 분석표 출력
+// → 개인 분석 화면(S4)에서 실제 분석을 실행해 그래프를 생성한 뒤,
+//   그 그래프를 캡처하여 분석실행 출력과 동일한 양식으로 출력
 function doPrintPersonal(){
   var sid = document.getElementById('printStudent').value;
   if(!sid){ toast('학생을 선택해주세요','ng'); return; }
   var eks = Object.keys(_printSelectedExams).filter(function(k){return _printSelectedExams[k];});
   if(eks.length===0){ toast('출력할 시험을 1개 이상 선택해주세요','ng'); return; }
-  printPersonalInNewWindow(sid, eks);
+
+  toast('분석표 생성 중...','pr',1500);
+
+  // 1) 개인 분석 화면(S4)에 학생/시험 설정
+  // 선생님 드롭다운(권한)도 맞춰줌
+  var st = DB.students.find(function(x){return x.id===sid;});
+  if(st && st.teacher){
+    window._anaTeacher = getMyTeacherName() ? getMyTeacherName() : st.teacher;
+  }
+  if(typeof fillAnaTeacher==='function') fillAnaTeacher();
+  if(typeof fillAnaStudents==='function') fillAnaStudents();
+  var anaSel = document.getElementById('anaStudent');
+  if(anaSel) anaSel.value = sid;
+
+  // 선택한 시험들만 분석 대상으로 설정
+  selectedAnaExams = {};
+  eks.forEach(function(k){ selectedAnaExams[k]=true; });
+  if(typeof updateAnaExamFilter==='function') updateAnaExamFilter();
+  // updateAnaExamFilter가 선택을 초기화할 수 있으므로 다시 설정
+  selectedAnaExams = {};
+  eks.forEach(function(k){ selectedAnaExams[k]=true; });
+
+  // 2) 분석 화면을 잠시 활성화해야 차트(canvas)가 그려짐
+  var s4 = document.getElementById('s4');
+  var prevActiveSection = document.querySelector('.sec.act');
+  var needRestore = false;
+  if(s4 && !s4.classList.contains('act')){
+    if(prevActiveSection) prevActiveSection.classList.remove('act');
+    s4.classList.add('act');
+    needRestore = true;
+  }
+
+  // 3) 분석 실행 (그래프 그려짐)
+  if(typeof runPersonalAnalysis==='function') runPersonalAnalysis();
+
+  // 4) 차트 렌더링 후 캡처 → 출력 (약간의 지연으로 렌더 완료 대기)
+  setTimeout(function(){
+    var charts = (typeof captureAnalysisCharts==='function') ? captureAnalysisCharts() : null;
+    // 화면 원상복구
+    if(needRestore && s4 && prevActiveSection){
+      s4.classList.remove('act');
+      prevActiveSection.classList.add('act');
+    }
+    printPersonalInNewWindow(sid, eks, charts);
+  }, 700);
 }
 
 // ── 출력용 유형별 정답률 바 차트 HTML (인쇄용) ──
