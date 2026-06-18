@@ -972,11 +972,11 @@ body::before{content:'';position:fixed;inset:0;background:
 <div class="card">
 <div class="ct"><span class="ci">📲</span> 학부모 공유 리포트</div>
 <p style="font-size:12px;color:var(--mu);margin-bottom:12px;">학생 선택 → 시험 선택 → 링크 생성 → 복사 후 발송. 학부모는 링크만으로 성적을 확인합니다.</p>
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+<div style="max-width:520px;">
 <div>
-<div id="sharePhoneStatus" style="font-size:11px;padding:6px 10px;background:var(--sf);border-radius:7px;margin-bottom:10px;"></div>
 <div class="fg"><label>학년 필터</label><select id="shareGradeFilter" onchange="renderShareStudents()" style="padding:7px;border-radius:7px;border:1.5px solid var(--bo);font-size:12px;width:100%;"></select></div>
 <div class="fg"><label>학생 선택</label><select id="shareStudentSel" onchange="onShareStudentChange()" style="padding:7px;border-radius:7px;border:1.5px solid var(--bo);font-size:12px;width:100%;"><option value="">-- 학생 선택 --</option></select></div>
+<div id="shareParentInfo" style="display:none;font-size:11px;padding:7px 10px;background:var(--pp);border-radius:7px;margin-bottom:10px;color:var(--pr);font-weight:700;"></div>
 <div class="fg"><label>공유할 시험</label><div id="shareExamList" style="max-height:120px;overflow-y:auto;border:1px solid var(--bd);border-radius:7px;padding:8px;font-size:12px;color:var(--mu);">학생을 먼저 선택하세요</div></div>
 <button class="btn btn-pr" onclick="genShareLink()" style="width:100%;margin-top:4px;">🔗 링크 생성</button>
 <div id="shareResultBox" style="display:none;margin-top:10px;">
@@ -984,20 +984,7 @@ body::before{content:'';position:fixed;inset:0;background:
 <div style="display:flex;gap:6px;"><button class="btn btn-sm" onclick="openSharePreview()" style="flex:1;background:#fee500;color:#000;font-weight:700;">🔍 미리보기</button><button class="btn btn-sm" onclick="sendSMSShare()" style="flex:1;background:var(--ok);color:#fff;">📱 문자</button></div>
 </div>
 </div>
-<div>
-<div class="card card-sm" style="margin-bottom:10px;">
-<div class="ct" style="font-size:12px;"><span class="ci">📞</span> 전화번호 관리</div>
-<div style="font-size:11px;color:var(--mu);margin-bottom:6px;">CSV: 이름,전화번호 (헤더없이)</div>
-<div style="display:flex;gap:6px;margin-bottom:6px;"><button class="btn btn-mu btn-sm" onclick="importPhoneCSV()" style="flex:1;">📥 CSV</button><button class="btn btn-sm" onclick="clearPhoneMap()" style="flex:1;background:#fee2e2;color:#991b1b;">🗑️</button></div>
-<div id="phoneMapList" style="max-height:80px;overflow-y:auto;font-size:11px;"></div>
-</div>
-<div class="card card-sm">
-<div class="ct" style="font-size:12px;"><span class="ci">👥</span> 전체 일괄 링크</div>
-<div class="fg"><label>기준 시험</label><select id="bulkShareExam" style="padding:7px;border-radius:7px;border:1.5px solid var(--bo);font-size:12px;width:100%;"><option value="">-- 선택 --</option></select></div>
-<button class="btn btn-pr btn-sm" onclick="genBulkLinks()" style="width:100%;">🔗 전체 생성</button>
-<div id="bulkLinkResult" style="display:none;margin-top:8px;"><div id="bulkLinkCount" style="font-size:11px;font-weight:700;color:var(--pr);margin-bottom:6px;"></div><div id="bulkLinkList" style="max-height:150px;overflow-y:auto;"></div><button class="btn btn-mu btn-sm" style="margin-top:6px;width:100%;" onclick="copyAllLinks()">📋 전체 복사</button></div>
-</div>
-</div>
+
 </div>
 </div>
 </div>
@@ -6052,12 +6039,7 @@ function initShareTab(){
   if(!g)return;
   g.innerHTML='<option value="">전체 학년</option>';
   GRADE_LIST.forEach(function(gr){g.innerHTML+='<option value="'+gr.key+'">'+gr.label+'</option>';});
-  var b=document.getElementById('bulkShareExam');
-  b.innerHTML='<option value="">-- 시험 선택 --</option>';
-  Object.keys(DB.exams).forEach(function(k){b.innerHTML+='<option value="'+k+'">'+(EXAM_LABEL[k]||k)+'</option>';});
   renderShareStudents();
-  updatePhoneStatus();
-  renderPhoneList();
 }
 
 function updatePhoneStatus(){
@@ -6072,17 +6054,42 @@ function renderShareStudents(){
   var grade=document.getElementById('shareGradeFilter').value;
   var sel=document.getElementById('shareStudentSel');
   sel.innerHTML='<option value="">-- 학생 선택 --</option>';
-  DB.students.filter(function(s){return!grade||GRADE_KEY_MAP[s.grade]===grade;}).forEach(function(s){
-    sel.innerHTML+='<option value="'+s.id+'">'+escHtml(s.name)+' ('+escHtml(s.grade||'')+')'+((PHONE_MAP[s.name]||s.phone)?' 📞':'')+'</option>';
+  // 권한: 일반 선생님은 본인 반만
+  var myName=(typeof getMyTeacherName==='function')?getMyTeacherName():null;
+  DB.students.filter(function(s){
+    if(grade && GRADE_KEY_MAP[s.grade]!==grade) return false;
+    if(myName && s.teacher!==myName) return false;
+    return true;
+  }).forEach(function(s){
+    sel.innerHTML+='<option value="'+s.id+'">'+escHtml(s.name)+' ('+escHtml(s.grade||'')+')'+(s.parentPhone?' 📞':'')+'</option>';
   });
   document.getElementById('shareResultBox').style.display='none';
   document.getElementById('shareExamList').innerHTML='학생을 먼저 선택하세요';
+  var pinfo=document.getElementById('shareParentInfo'); if(pinfo) pinfo.style.display='none';
 }
 
 function onShareStudentChange(){
   var sid=document.getElementById('shareStudentSel').value;
   document.getElementById('shareResultBox').style.display='none';
-  if(!sid){document.getElementById('shareExamList').innerHTML='학생을 먼저 선택하세요';return;}
+  var pinfo=document.getElementById('shareParentInfo');
+  if(!sid){
+    document.getElementById('shareExamList').innerHTML='학생을 먼저 선택하세요';
+    if(pinfo) pinfo.style.display='none';
+    return;
+  }
+  // 보호자 연락처 자동 반영 안내
+  var st=DB.students.find(function(x){return x.id===sid;});
+  if(pinfo){
+    if(st && st.parentPhone){
+      pinfo.style.display='block';
+      pinfo.innerHTML='📞 보호자 연락처 '+st.parentPhone+' · 리포트 암호: 뒷 4자리('+st.parentPhone.slice(-4)+')';
+      pinfo.style.background='var(--pp)'; pinfo.style.color='var(--pr)';
+    } else {
+      pinfo.style.display='block';
+      pinfo.innerHTML='⚠️ 이 학생은 보호자 연락처가 없습니다. 학생 관리에서 등록하면 리포트에 암호가 적용됩니다.';
+      pinfo.style.background='rgba(244,63,94,.08)'; pinfo.style.color='var(--ng)';
+    }
+  }
   var keys=Object.keys(DB.scores[sid]||{});
   if(!keys.length){document.getElementById('shareExamList').innerHTML='<span style="color:var(--ng)">성적 입력 시험 없음</span>';return;}
   document.getElementById('shareExamList').innerHTML=keys.map(function(k){
@@ -6125,7 +6132,7 @@ function sendSMSShare(){
   var sid=document.getElementById('shareStudentSel').value;
   if(!sid){toast('학생 선택','ng');return;}
   var s=DB.students.find(function(x){return x.id===sid;});
-  var phone=s?(PHONE_MAP[s.name]||s.phone||''):'';
+  var phone=s?(s.parentPhone||''):'';
   var url=document.getElementById('shareLinkInput').value;
   if(!url){toast('먼저 링크 생성','ng');return;}
   if(!phone){toast('전화번호 없음','wn');return;}
