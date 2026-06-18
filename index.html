@@ -977,7 +977,12 @@ body::before{content:'';position:fixed;inset:0;background:
 <div class="fg"><label>학년 필터</label><select id="shareGradeFilter" onchange="renderShareStudents()" style="padding:7px;border-radius:7px;border:1.5px solid var(--bo);font-size:12px;width:100%;"></select></div>
 <div class="fg"><label>학생 선택</label><select id="shareStudentSel" onchange="onShareStudentChange()" style="padding:7px;border-radius:7px;border:1.5px solid var(--bo);font-size:12px;width:100%;"><option value="">-- 학생 선택 --</option></select></div>
 <div id="shareParentInfo" style="display:none;font-size:11px;padding:7px 10px;background:var(--pp);border-radius:7px;margin-bottom:10px;color:var(--pr);font-weight:700;"></div>
-<div class="fg"><label>공유할 시험</label><div id="shareExamList" style="max-height:120px;overflow-y:auto;border:1px solid var(--bd);border-radius:7px;padding:8px;font-size:12px;color:var(--mu);">학생을 먼저 선택하세요</div></div>
+<div class="fg"><label>공유할 시험</label>
+<div id="shareExamControls" style="display:none;gap:6px;margin-bottom:6px;">
+<button class="btn btn-sm" onclick="selectAllShareExams()" style="padding:3px 9px;font-size:11px;">전체선택</button>
+<button class="btn btn-sm" onclick="deselectAllShareExams()" style="padding:3px 9px;font-size:11px;">전체해제</button>
+</div>
+<div id="shareExamList" style="max-height:180px;overflow-y:auto;border:1px solid var(--bd);border-radius:7px;padding:6px;font-size:12px;color:var(--mu);">학생을 먼저 선택하세요</div></div>
 <button class="btn btn-pr" onclick="genShareLink()" style="width:100%;margin-top:4px;">🔗 링크 생성</button>
 <div id="shareResultBox" style="display:none;margin-top:10px;">
 <div style="display:flex;gap:6px;margin-bottom:7px;"><input id="shareLinkInput" type="text" readonly style="flex:1;padding:6px;background:var(--sf);border:1px solid var(--bd);border-radius:7px;font-size:10px;font-family:monospace;"><button class="btn btn-pr btn-sm" onclick="copyShareLink()">복사</button></div>
@@ -6090,12 +6095,41 @@ function onShareStudentChange(){
       pinfo.style.background='rgba(244,63,94,.08)'; pinfo.style.color='var(--ng)';
     }
   }
-  var keys=Object.keys(DB.scores[sid]||{});
-  if(!keys.length){document.getElementById('shareExamList').innerHTML='<span style="color:var(--ng)">성적 입력 시험 없음</span>';return;}
+  var keys=Object.keys(DB.scores[sid]||{}).filter(function(k){return DB.exams[k];});
+  var ctrl=document.getElementById('shareExamControls');
+  if(!keys.length){
+    document.getElementById('shareExamList').innerHTML='<span style="color:var(--ng)">성적 입력된 시험이 없습니다</span>';
+    if(ctrl) ctrl.style.display='none';
+    return;
+  }
   document.getElementById('shareExamList').innerHTML=keys.map(function(k){
-    return'<label style="display:flex;align-items:center;gap:7px;padding:3px 0;cursor:pointer;">'
-      +'<input type="checkbox" class="share-cb" value="'+k+'" checked><span>'+escHtml(EXAM_LABEL[k]||k)+'</span></label>';
+    return '<label class="share-exam-item" style="display:flex;align-items:center;gap:9px;padding:8px 10px;margin-bottom:4px;border:1px solid var(--bd);border-radius:7px;cursor:pointer;background:var(--bg);transition:all .15s;">'
+      +'<input type="checkbox" class="share-cb" value="'+k+'" checked onchange="updateShareItemStyle(this)" style="width:16px;height:16px;cursor:pointer;flex-shrink:0;">'
+      +'<span style="font-size:12px;color:var(--tx);font-weight:600;">'+escHtml(EXAM_LABEL[k]||k)+'</span></label>';
   }).join('');
+  if(ctrl) ctrl.style.display='flex';
+  // 초기 체크 상태 스타일 반영
+  document.querySelectorAll('.share-cb').forEach(function(cb){ updateShareItemStyle(cb); });
+}
+
+function updateShareItemStyle(cb){
+  var label=cb.closest('.share-exam-item');
+  if(!label) return;
+  if(cb.checked){
+    label.style.background='rgba(91,108,255,0.08)';
+    label.style.borderColor='var(--pr)';
+  } else {
+    label.style.background='var(--bg)';
+    label.style.borderColor='var(--bd)';
+  }
+}
+
+function selectAllShareExams(){
+  document.querySelectorAll('.share-cb').forEach(function(cb){ cb.checked=true; updateShareItemStyle(cb); });
+}
+
+function deselectAllShareExams(){
+  document.querySelectorAll('.share-cb').forEach(function(cb){ cb.checked=false; updateShareItemStyle(cb); });
 }
 
 function genShareLink(){
