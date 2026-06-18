@@ -6302,9 +6302,9 @@ function runLoginDiagnostic(){
   if(!window.fb){ add('③ Firebase: ❌ 로드 안 됨. 인터넷/광고차단 확인. 이게 원인입니다.'); show(); return; }
   add('③ Firebase: ✅ 로드됨');
 
-  // 4) 익명 인증 테스트
+  // 4) 익명 인증 테스트 (기존 세션 재사용)
   add('④ 익명 인증 시도 중...');
-  window.fb.signInAnonymously(window.fb.auth)
+  ensureAnonAuth()
     .then(function(){
       add('   ✅ 익명 인증 성공');
       // 5) 계정 목록 읽기 테스트
@@ -6328,8 +6328,7 @@ function runLoginDiagnostic(){
       }
       add('────────────────');
       add('✅ 진단 완료. 위 내용을 확인하세요.');
-      // 진단용 익명 세션 정리
-      try{ window.fb.signOut(window.fb.auth); }catch(e){}
+      // 익명 세션은 유지 (다음 로그인 때 재사용 → 익명 사용자 누적 방지)
       show();
     })
     .catch(function(err){
@@ -6348,7 +6347,7 @@ function runLoginDiagnostic(){
         add('🔴 원인 코드: '+code);
         add('이 내용을 그대로 알려주세요.');
       }
-      try{ window.fb.signOut(window.fb.auth); }catch(e){}
+      // 익명 세션 유지 (재사용)
       show();
     });
 }
@@ -6390,6 +6389,19 @@ function saveAccounts(list){
 }
 
 // === 선생님 로그인 ===
+// 익명 인증 재사용: 이미 익명 로그인돼 있으면 그대로 쓰고, 없을 때만 새로 생성
+// (매번 새 익명 사용자가 쌓이는 것을 방지)
+function ensureAnonAuth(){
+  var cur = window.fb.auth.currentUser;
+  // 이미 익명으로 로그인된 상태면 새로 만들지 않고 재사용
+  if(cur && cur.isAnonymous){
+    return Promise.resolve(cur);
+  }
+  return window.fb.signInAnonymously(window.fb.auth).then(function(res){
+    return res.user;
+  });
+}
+
 function doTeacherLogin(){
   var id=(document.getElementById('tLoginId').value||'').trim();
   var pw=document.getElementById('tLoginPw').value||'';
@@ -6399,8 +6411,8 @@ function doTeacherLogin(){
   setLoginStatus('로그인 중...');
   document.getElementById('tLoginBtn').disabled=true;
 
-  // 1) 익명 인증으로 Firestore 접근 권한 확보
-  window.fb.signInAnonymously(window.fb.auth)
+  // 1) 익명 인증으로 Firestore 접근 권한 확보 (기존 세션 재사용)
+  ensureAnonAuth()
     .then(function(){ return loadAccounts(); })
     .then(function(accounts){
       // 2) 아이디 찾기
@@ -6570,9 +6582,8 @@ function bindAuthWatcher(){
       // 익명 사용자(선생님) vs 이메일 사용자(관리자) 구분
       var isAnon = !!user.isAnonymous;
       // 익명인데 선생님 검증을 안 거쳤으면 (예: 새로고침으로 익명 세션만 복원된 경우)
-      // → 익명 세션을 정리하고 로그인 화면을 다시 보여줌
+      // → 로그인 화면을 다시 보여줌 (익명 세션은 유지해서 재로그인 때 재사용)
       if(isAnon && !window._teacherLogin){
-        try{ window.fb.signOut(window.fb.auth); }catch(e){}
         var lo0=document.getElementById('loginOverlay'); if(lo0) lo0.style.display='flex';
         return;
       }
