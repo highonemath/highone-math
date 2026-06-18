@@ -6132,6 +6132,14 @@ function deselectAllShareExams(){
   document.querySelectorAll('.share-cb').forEach(function(cb){ cb.checked=false; updateShareItemStyle(cb); });
 }
 
+// 짧은 랜덤 코드 생성 (8자리, 혼동되는 문자 제외)
+function genShareCode(){
+  var chars='abcdefghjkmnpqrstuvwxyz23456789';
+  var code='';
+  for(var i=0;i<8;i++){ code+=chars.charAt(Math.floor(Math.random()*chars.length)); }
+  return code;
+}
+
 function genShareLink(){
   var sid=document.getElementById('shareStudentSel').value;
   if(!sid){toast('학생을 선택하세요','ng');return;}
@@ -6147,12 +6155,30 @@ function genShareLink(){
     if(DB.exams[k])d.e[k]=DB.exams[k];
     if(DB.scores[sid]&&DB.scores[sid][k])d.sc[k]=DB.scores[sid][k];
   });
-  try{
-    var url=location.href.split('#')[0]+'#share='+btoa(unescape(encodeURIComponent(JSON.stringify(d))));
-    document.getElementById('shareLinkInput').value=url;
-    document.getElementById('shareResultBox').style.display='block';
-    if(!pw) toast('이 학생은 보호자 연락처가 없어 암호 없이 열립니다','wn',4000);
-  }catch(e){toast('데이터가 너무 큽니다','ng');}
+
+  if(!window.fb){ toast('서버 연결 준비 중입니다. 잠시 후 다시 시도하세요','ng',4000); return; }
+
+  toast('링크 생성 중...','pr',1500);
+  // Firestore에 저장하고 짧은 코드 링크 발급
+  var code=genShareCode();
+  var ref=window.fb.doc(window.fb.db,'shared_reports',code);
+  window.fb.setDoc(ref, {data:JSON.stringify(d), createdAt:Date.now()})
+    .then(function(){
+      var url=location.href.split('#')[0]+'#r='+code;
+      document.getElementById('shareLinkInput').value=url;
+      document.getElementById('shareResultBox').style.display='block';
+      if(!pw) toast('이 학생은 보호자 연락처가 없어 암호 없이 열립니다','wn',4000);
+      else toast('짧은 링크가 생성되었습니다 ✅','ok');
+    })
+    .catch(function(err){
+      // Firestore 저장 실패 시 기존 긴 링크 방식으로 폴백
+      try{
+        var url=location.href.split('#')[0]+'#share='+btoa(unescape(encodeURIComponent(JSON.stringify(d))));
+        document.getElementById('shareLinkInput').value=url;
+        document.getElementById('shareResultBox').style.display='block';
+        toast('짧은 링크 저장 실패 — 기존 방식으로 생성됨','wn',4000);
+      }catch(e){ toast('링크 생성 실패: '+(err.code||err.message||''),'ng',4000); }
+    });
 }
 
 function copyShareLink(){
@@ -6264,16 +6290,56 @@ function copyAllLinks(){
 }
 
 function checkShareHash(){
+  // 짧은 코드 방식: #r=code → Firestore에서 데이터 로드
+  if(location.hash && location.hash.startsWith('#r=')){
+    var code=location.hash.substring(3);
+    showReportLoading();
+    if(!window.fb){
+      // Firebase 로드 대기 후 재시도
+      setTimeout(checkShareHash, 600);
+      return;
+    }
+    var ref=window.fb.doc(window.fb.db,'shared_reports',code);
+    window.fb.getDoc(ref).then(function(snap){
+      if(!snap.exists()){ showReportError('리포트를 찾을 수 없습니다. 링크가 만료되었거나 잘못되었습니다.'); return; }
+      try{
+        var data=JSON.parse(snap.data().data);
+        if(data.pw){ showReportPasswordGate(data); }
+        else { renderParentReport(data); }
+      }catch(e){ showReportError('리포트 데이터를 읽을 수 없습니다.'); }
+    }).catch(function(err){
+      showReportError('리포트를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.');
+    });
+    return;
+  }
+  // 기존 긴 링크 방식: #share=base64 (이전 링크 호환)
   if(!location.hash||!location.hash.startsWith('#share='))return;
   try{
-    var data=JSON.parse(decodeURIComponent(escape(atob(location.hash.substring(7)))));
-    if(data.pw){
-      // 암호가 설정된 리포트 → 암호 입력 화면 먼저
-      showReportPasswordGate(data);
+    var data2=JSON.parse(decodeURIComponent(escape(atob(location.hash.substring(7)))));
+    if(data2.pw){
+      showReportPasswordGate(data2);
     } else {
-      renderParentReport(data);
+      renderParentReport(data2);
     }
   }catch(e){}
+}
+
+// 리포트 로딩 화면
+function showReportLoading(){
+  document.body.innerHTML='<div style="font-family:Pretendard,sans-serif;background:linear-gradient(135deg,#1a3a6b,#2557a7);margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;color:#fff;text-align:center;">'
+    +'<div><div style="font-size:40px;margin-bottom:16px;">📊</div><div style="font-size:16px;font-weight:700;">성적 리포트를 불러오는 중...</div></div></div>';
+  document.body.style.margin='0';
+}
+
+// 리포트 오류 화면
+function showReportError(msg){
+  document.body.innerHTML='<div style="font-family:Pretendard,sans-serif;background:linear-gradient(135deg,#1a3a6b,#2557a7);margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;">'
+    +'<div style="background:#fff;border-radius:20px;padding:36px 30px;max-width:320px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.3);">'
+    +'<div style="font-size:40px;margin-bottom:14px;">😢</div>'
+    +'<div style="font-size:15px;font-weight:700;color:#1a3a6b;line-height:1.5;">'+escHtml(msg)+'</div>'
+    +'<div style="font-size:12px;color:#94a3b8;margin-top:14px;">학원에 문의해주세요.</div>'
+    +'</div></div>';
+  document.body.style.margin='0';
 }
 
 // 리포트 암호 입력 화면
@@ -6352,7 +6418,7 @@ function renderParentReport(data){
 
 // 학부모 공유 링크로 접속한 경우엔 로그인 없이 리포트만 표시
 loadPhoneMap();
-if(location.hash&&location.hash.startsWith('#share=')){
+if(location.hash && (location.hash.startsWith('#share=') || location.hash.startsWith('#r='))){
   // 공유 리포트 모드: 로그인 화면 숨기고 리포트 렌더
   var _lo=document.getElementById('loginOverlay'); if(_lo)_lo.style.display='none';
   checkShareHash();
