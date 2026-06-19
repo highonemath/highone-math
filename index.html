@@ -6413,19 +6413,18 @@ function showReportPasswordGate(data){
 function renderParentReport(data){
   var s=data.s, exams=data.e||{}, scores=data.sc||{}, ks=Object.keys(exams);
 
-  // ── 전체 집계 ──
   var tok=0,tq=0;
   ks.forEach(function(k){(exams[k].questions||[]).forEach(function(q,i){tq++;if((scores[k]||[])[i])tok++;});});
   var pct=tq?Math.round(tok/tq*100):0, lv=getLvInfo(pct);
 
-  // ── 회차별 ──
+  // 회차별
   var trend=ks.map(function(k){
     var ex=exams[k],ans=scores[k]||[],ok=0,tot=(ex.questions||[]).length;
     (ex.questions||[]).forEach(function(q,i){if(ans[i])ok++;});
     return{label:EXAM_LABEL[k]||k,ok:ok,tot:tot,pct:tot?Math.round(ok/tot*100):0};
   });
 
-  // ── 소단원별 ──
+  // 소단원별
   var unitMap={};
   ks.forEach(function(k){(exams[k].questions||[]).forEach(function(q,i){
     var u=q.unit||q.major||'기타';
@@ -6435,7 +6434,7 @@ function renderParentReport(data){
   var unitArr=Object.keys(unitMap).map(function(u){var m=unitMap[u];return{unit:u,ok:m.ok,tot:m.tot,pct:m.tot?Math.round(m.ok/m.tot*100):0};});
   unitArr.sort(function(a,b){return a.pct-b.pct;});
 
-  // ── 유형별 ──
+  // 유형별
   var typeMap={};
   ks.forEach(function(k){(exams[k].questions||[]).forEach(function(q,i){
     var t=q.type||q.category||'기타';
@@ -6445,23 +6444,11 @@ function renderParentReport(data){
   var typeArr=Object.keys(typeMap).map(function(t){var m=typeMap[t];return{type:t,ok:m.ok,tot:m.tot,pct:m.tot?Math.round(m.ok/m.tot*100):0};});
   typeArr.sort(function(a,b){return a.pct-b.pct;});
 
-  // ── 오답 항목 (유형별 약점 공략법용) ──
+  // 오답(약점 공략법용)
   var wrongItems=[];
-  ks.forEach(function(k){(exams[k].questions||[]).forEach(function(q,i){
-    if(!((scores[k]||[])[i])) wrongItems.push(q);
-  });});
+  ks.forEach(function(k){(exams[k].questions||[]).forEach(function(q,i){ if(!((scores[k]||[])[i])) wrongItems.push(q); });});
 
-  var TC={'개념확인형':'#3b82f6','계산형':'#f59e0b','응용형':'#10b981','추론형':'#8b5cf6','서술형':'#ef4444','객관식':'#0ea5e9','기타':'#6b7280'};
-  function barColor(p){ return p>=80?'#10b981':p>=60?'#3b82f6':p>=40?'#f59e0b':'#ef4444'; }
-  function bar(label,p,sub,col){
-    return '<div style="margin-bottom:9px;">'
-      +'<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;"><span style="color:#444;font-weight:600;">'+label+'</span><span style="font-weight:800;color:'+col+';">'+p+'%'+(sub?' <span style="color:#bbb;font-weight:400;">'+sub+'</span>':'')+'</span></div>'
-      +'<div style="background:#eef1f6;border-radius:20px;height:8px;overflow:hidden;"><div style="width:'+p+'%;height:100%;background:'+col+';border-radius:20px;"></div></div></div>';
-  }
-  function card(title,inner){
-    return '<div style="background:#fff;border-radius:14px;padding:16px;margin-bottom:12px;box-shadow:0 2px 10px rgba(0,0,0,.06);">'
-      +'<div style="font-size:13px;font-weight:800;color:#1a3a6b;margin-bottom:12px;">'+title+'</div>'+inner+'</div>';
-  }
+  function getLv(p){return getLvInfo(p);}
 
   document.body.innerHTML='';
   document.body.style.cssText='font-family:Pretendard,sans-serif;background:#f5f7fb;margin:0;padding:0;';
@@ -6473,40 +6460,31 @@ function renderParentReport(data){
     +'<div style="font-size:24px;font-weight:900;margin:5px 0;">'+escHtml(s.n)+' 학생</div>'
     +'<div style="font-size:12px;opacity:.85;">'+escHtml(s.g||'')+(s.sc?' · '+escHtml(s.sc):'')+'</div></div>';
 
-  // 1) 📊 종합 성적 요약
+  // 종합 요약
   html+='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px;">'
     +'<div style="background:#fff;border-radius:14px;padding:16px 10px;text-align:center;box-shadow:0 2px 10px rgba(0,0,0,.06);"><div style="font-size:28px;font-weight:900;color:'+lv.color+';">'+pct+'%</div><div style="font-size:11px;color:#888;margin-top:2px;">종합 정답률</div></div>'
     +'<div style="background:#fff;border-radius:14px;padding:16px 10px;text-align:center;box-shadow:0 2px 10px rgba(0,0,0,.06);"><div style="font-size:24px;font-weight:900;color:#2557a7;">'+tok+'<span style="font-size:13px;color:#aaa;">/'+tq+'</span></div><div style="font-size:11px;color:#888;margin-top:2px;">맞은 문항</div></div>'
     +'<div style="background:#fff;border-radius:14px;padding:16px 10px;text-align:center;box-shadow:0 2px 10px rgba(0,0,0,.06);"><div style="font-size:14px;font-weight:900;color:'+lv.color+';line-height:1.3;margin-top:4px;">'+escHtml(lv.title)+'</div><div style="font-size:11px;color:#888;margin-top:4px;">성취 수준</div></div></div>';
 
-  // 2) 📈 회차별 성적
-  if(trend.length){
-    var inner='';
-    trend.forEach(function(t){ inner+=bar(escHtml(t.label),t.pct,'('+t.ok+'/'+t.tot+')',barColor(t.pct)); });
-    html+=card('📈 회차별 성적',inner);
+  function chartCard(title,canvasId,h){
+    return '<div style="background:#fff;border-radius:14px;padding:16px;margin-bottom:12px;box-shadow:0 2px 10px rgba(0,0,0,.06);">'
+      +'<div style="font-size:13px;font-weight:800;color:#1a3a6b;margin-bottom:12px;">'+title+'</div>'
+      +'<div style="position:relative;height:'+(h||200)+'px;"><canvas id="'+canvasId+'"></canvas></div></div>';
   }
 
-  // 3) 📚 소단원별 정답률
-  if(unitArr.length){
-    var inner2='<div style="font-size:10px;color:#aaa;margin:-6px 0 10px;">정답률이 낮은 단원부터 표시됩니다</div>';
-    unitArr.forEach(function(u){ inner2+=bar(escHtml(u.unit),u.pct,'('+u.ok+'/'+u.tot+')',barColor(u.pct)); });
-    html+=card('📚 소단원별 정답률',inner2);
-  }
+  // 📈 회차별 성적 (선형)
+  if(trend.length) html+=chartCard('📈 회차별 성적','pr_trend',200);
+  // 📚 소단원별 정답률 (막대)
+  if(unitArr.length) html+=chartCard('📚 소단원별 정답률','pr_unit',Math.max(200,unitArr.length*32));
+  // 🕸️ 단원별 레이더
+  if(unitArr.length>=3) html+=chartCard('🕸️ 단원별 성취 레이더','pr_radar',240);
+  // 📊 유형별 정답률 (도넛)
+  if(typeArr.length && !(typeArr.length===1 && typeArr[0].type==='기타')) html+=chartCard('📊 문항 유형별 정답률','pr_type',220);
 
-  // 4) 📊 유형별 정답률
-  if(typeArr.length && !(typeArr.length===1 && typeArr[0].type==='기타')){
-    var inner3='';
-    typeArr.forEach(function(t){ inner3+=bar(escHtml(t.type),t.pct,'',(TC[t.type]||'#6b7280')); });
-    html+=card('📊 유형별 정답률',inner3);
-  }
+  // 🎯 유형별 약점 공략법
+  try{ var tips=buildPrintTypeTips(wrongItems); if(tips) html+='<div style="background:#fff;border-radius:14px;padding:16px;margin-bottom:12px;box-shadow:0 2px 10px rgba(0,0,0,.06);"><div style="font-size:13px;font-weight:800;color:#1a3a6b;margin-bottom:12px;">🎯 유형별 약점 공략법</div>'+tips+'</div>'; }catch(e){}
 
-  // 5) 🎯 유형별 약점 공략법 (개인분석과 동일 함수 재사용)
-  try{
-    var tips=buildPrintTypeTips(wrongItems);
-    if(tips) html+=card('🎯 유형별 약점 공략법', tips);
-  }catch(e){}
-
-  // 6) 📝 시험별 상세
+  // 📝 시험별 상세
   var detail='';
   ks.forEach(function(k){
     var ex=exams[k],ans=scores[k]||[],ok=0,tot=(ex.questions||[]).length;
@@ -6520,25 +6498,59 @@ function renderParentReport(data){
       +(wr.length?'<div style="margin-top:8px;font-size:11px;color:#777;line-height:1.6;"><b style="color:#ef4444;">틀린 문항:</b> '+wr.join(', ')+'</div>':'<div style="margin-top:8px;font-size:11px;color:#10b981;font-weight:700;">✓ 전 문항 정답</div>')
       +'</div>';
   });
-  html+=card('📝 시험별 상세', detail);
+  html+='<div style="background:#fff;border-radius:14px;padding:16px;margin-bottom:12px;box-shadow:0 2px 10px rgba(0,0,0,.06);"><div style="font-size:13px;font-weight:800;color:#1a3a6b;margin-bottom:12px;">📝 시험별 상세</div>'+detail+'</div>';
 
-  // 7) 📝 종합 소견 (개인분석과 동일 buildEnhancedOverall 재사용)
+  // 📝 종합 소견
   var overall='';
-  try{
-    var lk=ks[ks.length-1];
-    overall=buildEnhancedOverall(exams[lk], scores[lk], s, pct, lv);
-  }catch(e){
-    var weakUnits=unitArr.filter(function(u){return u.pct<60;}).slice(0,3).map(function(u){return u.unit;});
-    overall = (pct>=80?escHtml(s.n)+' 학생은 전반적으로 우수한 성취를 보이고 있습니다. ':pct>=60?escHtml(s.n)+' 학생은 기본 개념은 잘 이해하고 있으나 응용력을 키울 필요가 있습니다. ':escHtml(s.n)+' 학생은 기초 개념 보완이 필요합니다. ')
-      + (weakUnits.length?weakUnits.join(', ')+' 단원의 추가 학습을 권장합니다.':'');
+  try{ var lk=ks[ks.length-1]; overall=buildEnhancedOverall(exams[lk], scores[lk], s, pct, lv); }
+  catch(e){
+    var weak=unitArr.filter(function(u){return u.pct<60;}).slice(0,3).map(function(u){return u.unit;});
+    overall=(pct>=80?escHtml(s.n)+' 학생은 전반적으로 우수한 성취를 보이고 있습니다. ':pct>=60?escHtml(s.n)+' 학생은 기본 개념은 잘 이해하고 있으나 응용력을 키울 필요가 있습니다. ':escHtml(s.n)+' 학생은 기초 개념 보완이 필요합니다. ')+(weak.length?weak.join(', ')+' 단원의 추가 학습을 권장합니다.':'');
   }
-  html+='<div style="background:linear-gradient(135deg,#eef2ff,#e0e7ff);border-radius:14px;padding:16px;margin:14px 0;border:1px solid #c7d2fe;">'
-    +'<div style="font-size:12px;font-weight:800;color:#3730a3;margin-bottom:8px;">📝 종합 소견</div>'
-    +'<div style="font-size:12px;color:#4338ca;line-height:1.8;">'+overall+'</div></div>';
+  html+='<div style="background:linear-gradient(135deg,#eef2ff,#e0e7ff);border-radius:14px;padding:16px;margin:14px 0;border:1px solid #c7d2fe;"><div style="font-size:12px;font-weight:800;color:#3730a3;margin-bottom:8px;">📝 종합 소견</div><div style="font-size:12px;color:#4338ca;line-height:1.8;">'+overall+'</div></div>';
 
   html+='<div style="text-align:center;font-size:10px;color:#bbb;padding:16px;">ⓒ HIGH-ONE 수학학원 · 성적 분석 리포트</div></div>';
   document.body.innerHTML=html;
+
+  // ── Chart.js 그래프 생성 (DOM 삽입 후) ──
+  setTimeout(function(){
+    if(typeof Chart==='undefined') return;
+    function bc(p){return p>=70?'rgba(16,185,129,.7)':p>=50?'rgba(245,158,11,.7)':'rgba(244,63,94,.7)';}
+    // 회차별 (선형)
+    if(trend.length && document.getElementById('pr_trend')){
+      new Chart(document.getElementById('pr_trend').getContext('2d'),{
+        type:'line',
+        data:{labels:trend.map(function(t){return t.label;}),datasets:[{label:'정답률(%)',data:trend.map(function(t){return t.pct;}),borderColor:'#7c3aed',backgroundColor:'rgba(124,58,237,.1)',pointBackgroundColor:'#7c3aed',pointRadius:5,tension:.3,fill:true}]},
+        options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{min:0,max:100,ticks:{callback:function(v){return v+'%';}}}}}
+      });
+    }
+    // 소단원별 (가로 막대)
+    if(unitArr.length && document.getElementById('pr_unit')){
+      new Chart(document.getElementById('pr_unit').getContext('2d'),{
+        type:'bar',
+        data:{labels:unitArr.map(function(u){return u.unit;}),datasets:[{label:'정답률(%)',data:unitArr.map(function(u){return u.pct;}),backgroundColor:unitArr.map(function(u){return bc(u.pct);}),borderRadius:5}]},
+        options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{min:0,max:100,ticks:{callback:function(v){return v+'%';}}}}}
+      });
+    }
+    // 레이더
+    if(unitArr.length>=3 && document.getElementById('pr_radar')){
+      new Chart(document.getElementById('pr_radar').getContext('2d'),{
+        type:'radar',
+        data:{labels:unitArr.map(function(u){return u.unit;}),datasets:[{label:'정답률(%)',data:unitArr.map(function(u){return u.pct;}),backgroundColor:'rgba(37,87,167,0.15)',borderColor:'rgba(37,87,167,0.8)',borderWidth:2,pointRadius:3}]},
+        options:{responsive:true,maintainAspectRatio:false,scales:{r:{min:0,max:100,ticks:{stepSize:25,font:{size:9},callback:function(v){return v+'%';}},pointLabels:{font:{size:10,weight:'600'}}}},plugins:{legend:{display:false}}}
+      });
+    }
+    // 유형별 (도넛)
+    if(typeArr.length && document.getElementById('pr_type')){
+      new Chart(document.getElementById('pr_type').getContext('2d'),{
+        type:'doughnut',
+        data:{labels:typeArr.map(function(t){return t.type+' ('+t.pct+'%)';}),datasets:[{data:typeArr.map(function(t){return t.pct;}),backgroundColor:['#7c3aed','#ec4899','#f59e0b','#10b981','#3b82f6','#0ea5e9','#6b7280'],borderWidth:2}]},
+        options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:10}}}}}
+      });
+    }
+  }, 60);
 }
+
 
 // ⚠️ 앱 초기화는 로그인 성공 후 startAppAfterLogin()에서 실행됩니다.
 // (페이지 로드 시 즉시 실행하던 updateBadges/syncPdfFlags 제거)
