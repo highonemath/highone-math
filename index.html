@@ -6888,6 +6888,11 @@ function bindAuthWatcher(){
   if(_authWatcherBound || !window.fb) return;
   _authWatcherBound=true;
   window.fb.onAuthStateChanged(window.fb.auth, function(user){
+    // ★ 공유 리포트 모드면 로그인 UI를 절대 건드리지 않음
+    if(window._isShareMode){
+      var loS=document.getElementById('loginOverlay'); if(loS) loS.style.display='none';
+      return;
+    }
     if(user){
       // 익명 사용자(선생님) vs 이메일 사용자(관리자) 구분
       var isAnon = !!user.isAnonymous;
@@ -7046,6 +7051,15 @@ function refreshAllViews(){
 
 // fb가 이미 준비됐으면 즉시 바인딩 (모듈이 먼저 로드된 경우)
 if(window.fb) bindAuthWatcher();
+
+// ★ 학부모 공유 링크 진입 처리 (#r= 짧은코드 또는 #share= 긴링크)
+// 로그인 화면을 띄우지 않고 리포트만 표시
+if(location.hash && (location.hash.indexOf('#r=')===0 || location.hash.indexOf('#share=')===0)){
+  window._isShareMode = true;
+  var _loShare=document.getElementById('loginOverlay'); if(_loShare) _loShare.style.display='none';
+  try{ loadPhoneMap(); }catch(e){}
+  checkShareHash();
+}
 
 </script>
 
