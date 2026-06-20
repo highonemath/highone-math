@@ -760,7 +760,7 @@ body::before{content:'';position:fixed;inset:0;background:
         <div style="position:relative;height:220px;"><canvas id="trendChart"></canvas></div>
       </div>
       <div class="card card-sm">
-        <div class="ct"><span class="ci">📊</span> 단원별 정답률</div>
+        <div class="ct"><span class="ci">📊</span> 단원별 정답률 (중단원)</div>
         <div style="position:relative;height:220px;"><canvas id="unitChart"></canvas></div>
       </div>
     </div>
@@ -800,7 +800,7 @@ body::before{content:'';position:fixed;inset:0;background:
       <div id="anaTypeTips"></div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
-      <div class="card card-sm"><div class="ct"><span class="ci">🕸️</span> 단원별 레이더</div><div style="position:relative;height:200px;"><canvas id="anaRadarUnit"></canvas></div></div>
+      <div class="card card-sm"><div class="ct"><span class="ci">🕸️</span> 단원별 레이더 (중단원)</div><div style="position:relative;height:200px;"><canvas id="anaRadarUnit"></canvas></div></div>
       <div class="card card-sm"><div class="ct"><span class="ci">📊</span> 유형별 정답률</div><div id="anaTypeBar" style="padding:4px 0;"></div></div>
     </div>
     <!-- 종합 소견 -->
@@ -1033,11 +1033,28 @@ body::before{content:'';position:fixed;inset:0;background:
   </div>
 </div>
 
+<!-- ===== 학생 응시현황 상세 모달 ===== -->
+<div class="modal-bg" id="attendanceModal">
+  <div class="modal" style="max-width:480px;">
+    <div class="modal-hd">
+      <div class="ci">🗓️</div>
+      <h3 id="attendanceModalTitle">응시현황</h3>
+    </div>
+    <div class="modal-bd">
+      <div id="attendanceModalBody" style="display:flex;flex-direction:column;gap:14px;"></div>
+    </div>
+    <div class="modal-ft">
+      <button class="btn btn-pr" onclick="closeStudentAttendanceModal()">닫기</button>
+    </div>
+  </div>
+</div>
+
 <!-- ===== 선생님 명단 관리 모달 ===== -->
 <!-- ===== 선생님 계정 관리 모달 (관리자 전용) ===== -->
 <div class="modal-bg" id="accountModal">
   <div class="modal" style="max-width:460px;">
     <div class="modal-hd"><div class="ci">👥</div><h3>선생님 계정 관리</h3></div>
+
     <div class="modal-bd">
       <div style="background:#eef2ff;border-radius:10px;padding:11px 13px;margin-bottom:14px;font-size:11px;color:#3730a3;line-height:1.6;">
         🔑 <b>관리자 전용</b> · 선생님 로그인용 아이디/비밀번호를 발급합니다.<br>
@@ -1792,6 +1809,41 @@ function sortExamKeysByRound(keys){
     // 회차가 같으면 키 문자열 순
     return (''+a).localeCompare(''+b);
   });
+}
+
+// === 응시현황 공통 헬퍼 ===
+// 학생이 특정 시험(examKey)에 응시(점수 입력)했는지 여부
+function hasAttended(studentId, examKey){
+  var sc = DB.scores[studentId] && DB.scores[studentId][examKey];
+  return !!(sc && sc.length);
+}
+// 학년키(g.key) → 해당 학년의 시험그룹 목록 [{gkey,glabel,exams:[{key,label}]}]
+function getGroupsForGrade(gradeKey){
+  var g = GRADE_LIST.find(function(x){return x.key===gradeKey;});
+  return g ? g.groups : [];
+}
+// 학생 1명의 응시현황 dot HTML (한 시험그룹 기준, ●=응시 ○=미응시)
+function attendanceDotsHtml(studentId, group, opts){
+  opts = opts||{};
+  var size = opts.size||9;
+  var html = '<span style="display:inline-flex;gap:2px;vertical-align:middle;">';
+  group.exams.forEach(function(e){
+    var on = hasAttended(studentId, e.key);
+    html += '<span title="'+escHtml(group.glabel+' '+e.label+(on?' · 응시':' · 미응시'))+'" style="display:inline-block;width:'+size+'px;height:'+size+'px;border-radius:50%;background:'+(on?'#10b981':'#e2e8f0')+';border:1px solid '+(on?'#0f9e72':'#cbd5e1')+';"></span>';
+  });
+  html += '</span>';
+  return html;
+}
+// 학생 1명의 "대표" 시험그룹 1개 선택: 응시 기록이 가장 많은(또는 최근) 그룹
+function pickMainGroupForStudent(studentId, gradeKey){
+  var groups = getGroupsForGrade(gradeKey);
+  if(!groups.length) return null;
+  var best=null, bestCnt=-1;
+  groups.forEach(function(g){
+    var cnt = g.exams.filter(function(e){return hasAttended(studentId, e.key);}).length;
+    if(cnt>bestCnt){ bestCnt=cnt; best=g; }
+  });
+  return best || groups[0];
 }
 
 
@@ -2992,7 +3044,23 @@ function renderStatsDashboard(){
   html+='</div>';
   html+='</div>';
 
+  // ===== 선생님별 회차당 응시현황 =====
+  html+='<div style="margin-top:16px;border:1px solid var(--bd);border-radius:10px;padding:12px;">';
+  html+='<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px;">';
+  html+='<div style="font-size:12px;font-weight:800;color:var(--dk);">🗓️ 선생님별 회차당 응시현황</div>';
+  html+='<div style="display:flex;gap:6px;">'
+    +'<select id="attGradeSel" onchange="renderAttendanceStatsSection()" style="font-size:11px;padding:5px 7px;border-radius:6px;border:1.5px solid var(--bo);"></select>'
+    +'<select id="attGroupSel" onchange="renderAttendanceStatsSection()" style="font-size:11px;padding:5px 7px;border-radius:6px;border:1.5px solid var(--bo);"></select>'
+    +'</div>';
+  html+='</div>';
+  html+='<div id="attendanceStatsBox"></div>';
+  html+='</div>';
+
   box.innerHTML=html;
+
+  // 학년/시험그룹 드롭다운 초기화 + 표 렌더 (관리자 전용 섹션이므로 여기서만 호출)
+  initAttendanceStatsSelectors();
+  renderAttendanceStatsSection();
 }
 
 // === 일반 선생님용 통계: 본인 반 + 전체 학년별 학생수 ===
@@ -3059,6 +3127,107 @@ function statCard(label, value, color){
   return '<div style="flex:1;min-width:90px;background:'+color+';color:#fff;border-radius:10px;padding:12px 14px;">'
     +'<div style="font-size:11px;opacity:.85;margin-bottom:3px;">'+label+'</div>'
     +'<div style="font-size:22px;font-weight:800;">'+value+'</div></div>';
+}
+
+// === 선생님별 회차당 응시현황 (관리자 전용, 학생관리 통계대시보드) ===
+function initAttendanceStatsSelectors(){
+  var gSel=document.getElementById('attGradeSel');
+  if(!gSel) return;
+  // 실제로 학생이 있는 학년만 후보로
+  var gradesWithStudents = GRADE_LIST.filter(function(g){
+    return DB.students.some(function(s){return GRADE_KEY_MAP[s.grade]===g.key;});
+  });
+  if(!gradesWithStudents.length) gradesWithStudents = GRADE_LIST;
+  var prevGrade = gSel.value;
+  gSel.innerHTML = gradesWithStudents.map(function(g){return '<option value="'+g.key+'">'+g.label+'</option>';}).join('');
+  if(prevGrade && gradesWithStudents.some(function(g){return g.key===prevGrade;})) gSel.value=prevGrade;
+
+  fillAttendanceGroupSelector();
+}
+function fillAttendanceGroupSelector(){
+  var gSel=document.getElementById('attGradeSel');
+  var grpSel=document.getElementById('attGroupSel');
+  if(!gSel || !grpSel) return;
+  var groups = getGroupsForGrade(gSel.value);
+  var prevGroup = grpSel.value;
+  grpSel.innerHTML = groups.map(function(g){return '<option value="'+g.gkey+'">'+g.glabel+'</option>';}).join('');
+  if(prevGroup && groups.some(function(g){return g.gkey===prevGroup;})) grpSel.value=prevGroup;
+}
+function renderAttendanceStatsSection(){
+  var box=document.getElementById('attendanceStatsBox');
+  if(!box) return;
+  var gSel=document.getElementById('attGradeSel');
+  var grpSel=document.getElementById('attGroupSel');
+  if(!gSel || !grpSel) return;
+
+  // 학년이 바뀌면 시험그룹 후보 갱신
+  fillAttendanceGroupSelector();
+
+  var gradeKey = gSel.value;
+  var groups = getGroupsForGrade(gradeKey);
+  var group = groups.find(function(g){return g.gkey===grpSel.value;}) || groups[0];
+  if(!group){ box.innerHTML='<div style="color:var(--mu);font-size:12px;">등록된 시험 그룹이 없습니다.</div>'; return; }
+
+  // 이 학년의 학생들 (담당 선생님별로 묶기)
+  var gradeStudents = DB.students.filter(function(s){return GRADE_KEY_MAP[s.grade]===gradeKey;});
+  var teachers=(DB.teachers||[]).slice().sort(function(a,b){return a.localeCompare(b,'ko');});
+  var hasNone = gradeStudents.some(function(s){return !s.teacher || teachers.indexOf(s.teacher)<0;});
+  var rowKeys = teachers.filter(function(t){return gradeStudents.some(function(s){return s.teacher===t;});});
+  if(hasNone) rowKeys.push('__none__');
+
+  if(!gradeStudents.length){
+    box.innerHTML='<div style="color:var(--mu);font-size:12px;">이 학년에 등록된 학생이 없습니다.</div>';
+    return;
+  }
+  if(!rowKeys.length){
+    box.innerHTML='<div style="color:var(--mu);font-size:12px;">표시할 선생님이 없습니다.</div>';
+    return;
+  }
+
+  var html = '<div style="overflow-x:auto;border:1px solid var(--bd);border-radius:8px;">';
+  html += '<table style="width:100%;border-collapse:collapse;font-size:11px;min-width:'+(110+group.exams.length*48+70)+'px;">';
+  html += '<thead><tr style="background:linear-gradient(135deg,#1a3a6b,#2557a7);color:#fff;">';
+  html += '<th style="padding:8px 10px;text-align:left;position:sticky;left:0;background:#1a3a6b;">선생님</th>';
+  group.exams.forEach(function(e){
+    html += '<th style="padding:8px 4px;text-align:center;white-space:nowrap;">'+escHtml(e.label)+'</th>';
+  });
+  html += '<th style="padding:8px 8px;text-align:center;background:#15305a;">합계</th>';
+  html += '</tr></thead><tbody>';
+
+  // 회차별 합계 집계용
+  var examTotals = group.exams.map(function(){return 0;});
+  var grandTotal=0, grandStudents=0;
+
+  rowKeys.forEach(function(t,ri){
+    var label = (t==='__none__') ? '❓ 미지정' : t;
+    var rowStudents = gradeStudents.filter(function(s){
+      return (t==='__none__') ? (!s.teacher||teachers.indexOf(s.teacher)<0) : (s.teacher===t);
+    });
+    var rowBg = ri%2===0 ? 'var(--bg)' : 'var(--sf)';
+    html += '<tr style="background:'+rowBg+';">';
+    html += '<td style="padding:7px 10px;font-weight:700;border-top:1px solid var(--bd);position:sticky;left:0;background:'+rowBg+';white-space:nowrap;">'+escHtml(label)+' <span style="color:var(--mu);font-weight:400;">('+rowStudents.length+'명)</span></td>';
+    var rowTotal=0;
+    group.exams.forEach(function(e,ei){
+      var cnt = rowStudents.filter(function(s){return hasAttended(s.id, e.key);}).length;
+      examTotals[ei]+=cnt; rowTotal+=cnt;
+      var cellStyle='padding:7px 4px;text-align:center;border-top:1px solid var(--bd);';
+      if(cnt>0) cellStyle+='font-weight:700;color:#2557a7;'; else cellStyle+='color:var(--bd);';
+      html += '<td style="'+cellStyle+'">'+(cnt||'·')+'</td>';
+    });
+    grandTotal+=rowTotal; grandStudents+=rowStudents.length;
+    html += '<td style="padding:7px 8px;text-align:center;font-weight:800;border-top:1px solid var(--bd);background:rgba(37,87,167,0.08);">'+rowTotal+'</td>';
+    html += '</tr>';
+  });
+
+  html += '<tr style="background:rgba(26,58,107,0.1);font-weight:800;">';
+  html += '<td style="padding:8px 10px;border-top:2px solid var(--pr);position:sticky;left:0;background:#dde6f5;">합계 ('+grandStudents+'명)</td>';
+  examTotals.forEach(function(v){
+    html += '<td style="padding:8px 4px;text-align:center;border-top:2px solid var(--pr);">'+(v||'·')+'</td>';
+  });
+  html += '<td style="padding:8px 8px;text-align:center;border-top:2px solid var(--pr);background:rgba(37,87,167,0.15);">'+grandTotal+'</td>';
+  html += '</tr></tbody></table></div>';
+
+  box.innerHTML = html;
 }
 
 // === 학생 선택(체크박스) 관리 ===
@@ -3210,20 +3379,30 @@ function renderStudents(){
       lastPct = Math.round(arr.filter(Boolean).length/arr.length*100)+'%';
     }
     var phoneTag = s.parentPhone ? '<span style="font-size:10px;color:var(--ok);" title="리포트 암호: '+s.parentPhone.slice(-4)+'">🔒'+s.parentPhone.slice(-4)+'</span>' : '';
-    return '<div class="std-card" data-sid="'+s.id+'">'
+    // 응시현황 dot (학생의 학년에서 응시 기록이 가장 많은 시험그룹 1개를 대표로 표시)
+    var attendDots = '';
+    var mainGroup = pickMainGroupForStudent(s.id, GRADE_KEY_MAP[s.grade]);
+    if(mainGroup){
+      attendDots = '<div style="display:flex;align-items:center;gap:5px;margin-top:6px;">'
+        +'<span style="font-size:9px;color:var(--mu);white-space:nowrap;">'+escHtml(mainGroup.glabel)+'</span>'
+        +attendanceDotsHtml(s.id, mainGroup, {size:8})
+        +'</div>';
+    }
+    return '<div class="std-card" data-sid="'+s.id+'" style="cursor:pointer;" title="클릭하면 응시현황을 볼 수 있어요">'
       +'<div style="display:flex;align-items:flex-start;gap:8px;">'
       +'<input type="checkbox" class="std-chk" data-sid="'+s.id+'" onclick="event.stopPropagation();toggleStudentSelect(\''+s.id+'\')" style="width:17px;height:17px;margin-top:2px;cursor:pointer;flex-shrink:0;">'
       +'<div style="flex:1;min-width:0;">'
       +'<div class="std-num">#'+(DB.students.indexOf(s)+1)+'</div>'
       +'<div class="std-name">'+escHtml(s.name)+'</div>'
       +'<div class="std-info">'+escHtml(s.grade)+(s.school?' · '+escHtml(s.school):'')+'</div>'
+      +attendDots
       +'<div style="display:flex;align-items:center;gap:6px;margin-top:10px;flex-wrap:wrap;">'
       +'<span style="font-size:11px;color:var(--mu);">시험 '+scoreCount+'회</span>'
       +phoneTag
       +(lastPct?'<span class="badge b-pr">최근 '+lastPct+'</span>':'')
       +'<div style="margin-left:auto;display:flex;gap:4px;">'
-      +'<button class="btn btn-mu btn-xs std-edit-btn" data-sid="'+s.id+'">✏️ 수정</button>'
-      +'<button class="btn btn-ng btn-xs std-del-btn" data-sid="'+s.id+'">🗑️</button>'
+      +'<button class="btn btn-mu btn-xs std-edit-btn" data-sid="'+s.id+'" onclick="event.stopPropagation();">✏️ 수정</button>'
+      +'<button class="btn btn-ng btn-xs std-del-btn" data-sid="'+s.id+'" onclick="event.stopPropagation();">🗑️</button>'
       +'</div></div></div></div></div>';
   }
 
@@ -3289,8 +3468,11 @@ function renderStudents(){
   document.getElementById('stdGrid').onclick = function(e){
     var eb = e.target.closest('.std-edit-btn');
     var db = e.target.closest('.std-del-btn');
-    if(eb) openStudentModal(eb.getAttribute('data-sid'));
-    if(db) doDeleteStudent(db.getAttribute('data-sid'));
+    if(eb){ openStudentModal(eb.getAttribute('data-sid')); return; }
+    if(db){ doDeleteStudent(db.getAttribute('data-sid')); return; }
+    // 체크박스 클릭은 이미 자체 핸들러에서 stopPropagation 처리됨
+    var card = e.target.closest('.std-card');
+    if(card) openStudentAttendanceModal(card.getAttribute('data-sid'));
   };
 }
 
@@ -3324,6 +3506,41 @@ function openStudentModal(id){
 function closeStudentModal(){
   document.getElementById('studentModal').classList.remove('open');
 }
+
+// === 학생 응시현황 상세 모달 ===
+function openStudentAttendanceModal(id){
+  var s = DB.students.find(function(x){return x.id===id;});
+  if(!s) return;
+  document.getElementById('attendanceModalTitle').textContent = s.name+' · 응시현황';
+
+  var gradeKey = GRADE_KEY_MAP[s.grade];
+  var groups = getGroupsForGrade(gradeKey);
+  var body = document.getElementById('attendanceModalBody');
+
+  if(!groups.length){
+    body.innerHTML = '<div style="color:var(--mu);font-size:12px;padding:8px;">이 학년에 등록된 시험 그룹이 없습니다.</div>';
+  } else {
+    var html = '<div style="font-size:11px;color:var(--mu);margin-bottom:2px;">'+escHtml(s.grade)+(s.school?' · '+escHtml(s.school):'')+'</div>';
+    groups.forEach(function(g){
+      var attendedCnt = g.exams.filter(function(e){return hasAttended(s.id, e.key);}).length;
+      html += '<div style="border:1px solid var(--bd);border-radius:10px;padding:10px 12px;">'
+        +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:7px;">'
+        +'<span style="font-size:12px;font-weight:800;color:var(--dk);">'+escHtml(g.glabel)+'</span>'
+        +'<span style="font-size:11px;color:var(--mu);font-weight:700;">'+attendedCnt+'/'+g.exams.length+'회</span>'
+        +'</div>'
+        +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
+        +attendanceDotsHtml(s.id, g, {size:13})
+        +'</div>'
+        +'</div>';
+    });
+    body.innerHTML = html;
+  }
+  document.getElementById('attendanceModal').classList.add('open');
+}
+function closeStudentAttendanceModal(){
+  document.getElementById('attendanceModal').classList.remove('open');
+}
+
 function saveStudent(){
   var name = document.getElementById('mName').value.trim();
   var grade = document.getElementById('mGrade').value;
@@ -4919,8 +5136,9 @@ function runPersonalAnalysis(){
       scales:{y:{min:0,max:100,ticks:{callback:function(v){return v+'%';}}}}}
   });
 
-  // ── 단원별 정답률 차트 ──
-  var unitMap={};
+  // ── 단원별 정답률 차트 (중단원/대단원 기준으로 묶어서 표시) ──
+  var unitMap={};   // 소단원 기준 — 통합 분석표·오답집중분석용
+  var majorMap={};  // 중단원(대단원) 기준 — 단원별 정답률 차트·레이더용
   examKeys.forEach(function(k){
     var ex=DB.exams[k]; var ans=allScores[k];
     ex.questions.forEach(function(q,i){
@@ -4928,10 +5146,15 @@ function runPersonalAnalysis(){
       if(!unitMap[u]) unitMap[u]={ok:0,tot:0};
       unitMap[u].tot++;
       if(ans[i]) unitMap[u].ok++;
+
+      var m=q.major||q.unit||'기타';
+      if(!majorMap[m]) majorMap[m]={ok:0,tot:0};
+      majorMap[m].tot++;
+      if(ans[i]) majorMap[m].ok++;
     });
   });
-  var uLabels=Object.keys(unitMap).slice(0,10);
-  var uData  =uLabels.map(function(u){return Math.round(unitMap[u].ok/unitMap[u].tot*100);});
+  var uLabels=Object.keys(majorMap).slice(0,10);
+  var uData  =uLabels.map(function(u){return Math.round(majorMap[u].ok/majorMap[u].tot*100);});
   var uColors=uData.map(function(v){return v>=70?'rgba(16,185,129,.7)':v>=50?'rgba(245,158,11,.7)':'rgba(244,63,94,.7)';});
 
   destroyChart('unitChart');
@@ -5044,9 +5267,10 @@ function runPersonalAnalysis(){
     }
   });
 
-  // ── 소단원별 통합 분석표 ──
+  // ── 소단원별 통합 분석표 (소단원 기준 유지) ──
   var tbody='';
-  uLabels.forEach(function(u){
+  var subUnitLabels=Object.keys(unitMap);
+  subUnitLabels.forEach(function(u){
     var um=unitMap[u];
     var pct2=Math.round(um.ok/um.tot*100);
     var bar='<div class="prog-bar"><div class="prog-fill'+(pct2>=70?' ok':pct2>=50?' wn':' ng')+'" style="width:'+pct2+'%"></div></div>';
@@ -5084,9 +5308,9 @@ function runPersonalAnalysis(){
   var _wr=[];
   examKeys.forEach(function(k){var ex=DB.exams[k],ans=allScores[k];ex.questions.forEach(function(q,i){if(!ans[i])_wr.push({question:q});});});
   document.getElementById('anaTypeTips').innerHTML=buildTypeTipsHTML(_wr);
-  // 레이더
-  var _uK=Object.keys(unitMap).slice(0,8);
-  buildRadarChart('anaRadarUnit',_uK,_uK.map(function(u){var m=unitMap[u];return m.tot?Math.round(m.ok/m.tot*100):0;}),'단원','rgba(37,87,167,0.2)');
+  // 레이더 (중단원 기준)
+  var _uK=Object.keys(majorMap).slice(0,8);
+  buildRadarChart('anaRadarUnit',_uK,_uK.map(function(u){var m=majorMap[u];return m.tot?Math.round(m.ok/m.tot*100):0;}),'단원','rgba(37,87,167,0.2)');
   var _tM={};examKeys.forEach(function(k){DB.exams[k].questions.forEach(function(q,i){var t=q.type||'기타';if(!_tM[t])_tM[t]={ok:0,tot:0};_tM[t].tot++;if(allScores[k][i])_tM[t].ok++;});});
   var _tK=Object.keys(_tM);
   // 유형별 정답률 가로 막대 차트
@@ -6590,9 +6814,10 @@ function renderParentReport(data){
     (ex.questions||[]).forEach(function(q,i){if(ans[i])ok++;});
     return{label:EXAM_LABEL[k]||k,ok:ok,tot:tot,pct:tot?Math.round(ok/tot*100):0,avg:(avgMap[k]!=null?avgMap[k]:null)};
   });
+  // 단원별 정답률·레이더 차트는 중단원(major) 기준 — 개인분석지(majorMap)와 동일
   var unitMap={};
   ks.forEach(function(k){(exams[k].questions||[]).forEach(function(q,i){
-    var u=q.unit||q.major||'기타'; if(!unitMap[u])unitMap[u]={ok:0,tot:0};
+    var u=q.major||q.unit||'기타'; if(!unitMap[u])unitMap[u]={ok:0,tot:0};
     unitMap[u].tot++; if((scores[k]||[])[i])unitMap[u].ok++;
   });});
   var unitArr=Object.keys(unitMap).map(function(u){var m=unitMap[u];return{unit:u,pct:m.tot?Math.round(m.ok/m.tot*100):0};});
@@ -6687,6 +6912,7 @@ document.addEventListener('keydown',function(e){
   if(e.key==='Escape'){
     document.getElementById('studentModal').classList.remove('open');
     document.getElementById('importModal').classList.remove('open');
+    var am=document.getElementById('attendanceModal'); if(am) am.classList.remove('open');
     confirmResolve(false);
   }
 });
