@@ -5632,12 +5632,23 @@ function printPersonalInNewWindow(sid, examKeys, chartImages, returnHtmlOnly){
     +'<div class="stat"><div class="stat-label">총 정답</div><div class="stat-value">'+totalRight+'<span style="font-size:13px">/'+totalQ+'</span></div></div>'
     +'<div class="stat"><div class="stat-label">시험 횟수</div><div class="stat-value">'+keys.length+'<span style="font-size:13px">회</span></div></div>'
     +'</div></div>'
-    // 분석 차트 (분석 실행 화면에서 캡처한 이미지)
+    // 분석 차트 (개인분석: 캡처 이미지 / 학부모: 빈 canvas로 두고 직접 그림)
     +((function(){
         if(!chartImages) return '';
         var ci=chartImages;
+        var canvasMode = (chartImages==='__CANVAS__'); // 학부모 모드
         var blocks='';
+        // canvas 모드일 땐 title→canvas id 매핑
+        var cidMap={'📈 회차별 성적 추이':'pcv_trend','📊 단원별 정답률':'pcv_unit','🎯 난이도별 정오답':'pcv_diff','🍰 오답 유형 분포':'pcv_type','🧠 문항 유형별 정답률':'pcv_cog','🕸️ 단원별 레이더':'pcv_radar','🔔 학생 위치 분석':'pcv_norm'};
         function chartBox(title,img){
+          if(canvasMode){
+            // 학부모용: 빈 canvas (나중에 직접 그림). 데이터 없으면 표시 안 함은 호출측에서 결정
+            var cid=cidMap[title];
+            return '<div style="border:1px solid #e2e8f0;border-radius:8px;padding:10px;background:#fff;">'
+              +'<div style="font-size:11px;font-weight:800;color:#475569;margin-bottom:6px;">'+title+'</div>'
+              +'<div style="position:relative;height:180px;"><canvas id="'+cid+'"></canvas></div>'
+              +'</div>';
+          }
           if(!img) return '';
           return '<div style="border:1px solid #e2e8f0;border-radius:8px;padding:10px;background:#fff;break-inside:avoid;page-break-inside:avoid;">'
             +'<div style="font-size:11px;font-weight:800;color:#475569;margin-bottom:6px;">'+title+'</div>'
@@ -6429,213 +6440,92 @@ function showReportPasswordGate(data){
 }
 
 function renderParentReport(data){
-  // 학부모 리포트: 보이는 화면(오버레이)에 Chart.js로 직접 그래프를 그린다.
-  // (개인분석 화면 캡처 방식은 캔버스가 숨겨져 있어 실패하므로 직접 렌더링)
+  // 개인분석지(printPersonalInNewWindow)를 그대로 사용해 100% 동일한 화면 생성.
+  // 그래프는 캡처 대신 빈 canvas로 받아, 학부모 화면에서 직접 Chart.js로 그린다.
   var s=data.s, exams=data.e||{}, scores=data.sc||{}, ks=Object.keys(exams);
 
-  // ── 집계 ──
-  var tok=0,tq=0;
-  ks.forEach(function(k){(exams[k].questions||[]).forEach(function(q,i){tq++;if((scores[k]||[])[i])tok++;});});
-  var pct=tq?Math.round(tok/tq*100):0, lv=getLvInfo(pct);
+  // 1) 임시 DB 주입 (개인분석지 함수가 DB를 참조하므로)
+  if(typeof DB==='undefined' || !DB){ window.DB={students:[],exams:{},scores:{},pdfFlags:{},teachers:[]}; }
+  var sid = s.id || ('parent_'+Date.now());
+  DB.students=[{id:sid,name:s.n,grade:s.g||'',school:s.sc||''}];
+  DB.exams={}; DB.scores={}; DB.scores[sid]={};
+  ks.forEach(function(k){
+    DB.exams[k]=exams[k];
+    DB.scores[sid][k]=scores[k]||[];
+    if(typeof EXAM_LABEL!=='undefined' && !EXAM_LABEL[k]) EXAM_LABEL[k]=k;
+  });
 
+  // 2) 개인분석지 HTML 생성 (그래프는 __CANVAS__ 모드 → 빈 canvas)
+  var htmlOut='';
+  try{
+    htmlOut = printPersonalInNewWindow(sid, ks.slice(), '__CANVAS__', true);
+  }catch(e){ console.warn('[학부모리포트] HTML 생성 오류:', e.message); htmlOut=''; }
+  if(!htmlOut){
+    _reportOverlay('<div style="font-family:Pretendard,sans-serif;padding:40px;text-align:center;color:#555;background:#fff;min-height:100vh;">리포트를 표시할 수 없습니다.<br>학원에 문의해주세요.</div>');
+    return;
+  }
+  // 자동 인쇄 스크립트 제거
+  htmlOut = htmlOut.replace(/<script>[\s\S]*?<\/script>/g,'');
+  // <body> 내용 + <style> 추출
+  var bodyMatch = htmlOut.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+  var bodyInner = bodyMatch ? bodyMatch[1] : htmlOut;
+  var styleMatch = htmlOut.match(/<style[^>]*>([\s\S]*?)<\/style>/i);
+  var styleTag = styleMatch ? '<style>'+styleMatch[1]+'</style>' : '';
+
+  // 3) 오버레이에 표시 (보이는 화면)
+  var ov=_reportOverlay(styleTag+'<div style="background:#fff;min-height:100vh;">'+bodyInner+'</div>');
+  ov.style.cssText='position:fixed;inset:0;z-index:99999;overflow:auto;background:#fff;';
+  window.scrollTo(0,0);
+
+  // 4) 그래프 데이터 집계 (개인분석과 동일 로직)
   var trend=ks.map(function(k){
     var ex=exams[k],ans=scores[k]||[],ok=0,tot=(ex.questions||[]).length;
     (ex.questions||[]).forEach(function(q,i){if(ans[i])ok++;});
     return{label:EXAM_LABEL[k]||k,ok:ok,tot:tot,pct:tot?Math.round(ok/tot*100):0};
   });
-
   var unitMap={};
   ks.forEach(function(k){(exams[k].questions||[]).forEach(function(q,i){
-    var u=q.unit||q.major||'기타';
-    if(!unitMap[u])unitMap[u]={ok:0,tot:0};
+    var u=q.unit||q.major||'기타'; if(!unitMap[u])unitMap[u]={ok:0,tot:0};
     unitMap[u].tot++; if((scores[k]||[])[i])unitMap[u].ok++;
   });});
-  var unitArr=Object.keys(unitMap).map(function(u){var m=unitMap[u];return{unit:u,ok:m.ok,tot:m.tot,pct:m.tot?Math.round(m.ok/m.tot*100):0};});
-  unitArr.sort(function(a,b){return a.pct-b.pct;});
-
+  var unitArr=Object.keys(unitMap).map(function(u){var m=unitMap[u];return{unit:u,pct:m.tot?Math.round(m.ok/m.tot*100):0};});
   var typeMap={};
   ks.forEach(function(k){(exams[k].questions||[]).forEach(function(q,i){
-    var t=q.type||q.category||'기타';
-    if(!typeMap[t])typeMap[t]={ok:0,tot:0};
+    var t=q.type||q.category||'기타'; if(!typeMap[t])typeMap[t]={ok:0,tot:0};
     typeMap[t].tot++; if((scores[k]||[])[i])typeMap[t].ok++;
   });});
-  var typeArr=Object.keys(typeMap).map(function(t){var m=typeMap[t];return{type:t,ok:m.ok,tot:m.tot,pct:m.tot?Math.round(m.ok/m.tot*100):0};});
-  typeArr.sort(function(a,b){return a.pct-b.pct;});
-
-  var wrongItems=[];
-  ks.forEach(function(k){(exams[k].questions||[]).forEach(function(q,i){ if(!((scores[k]||[])[i])) wrongItems.push(q); });});
-
-  // 난이도별 집계 (하/중/상)
+  var typeArr=Object.keys(typeMap).map(function(t){var m=typeMap[t];return{type:t,pct:m.tot?Math.round(m.ok/m.tot*100):0};});
+  // 난이도
   var diffOrder=['하','중','상'];
   var diffMap={'하':{ok:0,tot:0},'중':{ok:0,tot:0},'상':{ok:0,tot:0}};
   ks.forEach(function(k){(exams[k].questions||[]).forEach(function(q,i){
-    var d=q.diff||'';
-    if(d==='최하')d='하'; if(d==='최상')d='상';
-    if(!diffMap[d])return;
-    diffMap[d].tot++; if((scores[k]||[])[i])diffMap[d].ok++;
+    var d=q.diff||''; if(d==='최하')d='하'; if(d==='최상')d='상';
+    if(!diffMap[d])return; diffMap[d].tot++; if((scores[k]||[])[i])diffMap[d].ok++;
   });});
-  var hasDiff = (diffMap['하'].tot+diffMap['중'].tot+diffMap['상'].tot)>0;
 
-  function barColor(p){ return p>=80?'#10b981':p>=60?'#3b82f6':p>=40?'#f59e0b':'#ef4444'; }
-  function card(title,inner){
-    return '<div style="background:#fff;border-radius:14px;padding:16px;margin-bottom:12px;box-shadow:0 2px 10px rgba(0,0,0,.06);">'
-      +'<div style="font-size:13px;font-weight:800;color:#1a3a6b;margin-bottom:12px;">'+title+'</div>'+inner+'</div>';
-  }
-  function chartCard(title,cid,h){
-    return '<div style="background:#fff;border-radius:14px;padding:16px;margin-bottom:12px;box-shadow:0 2px 10px rgba(0,0,0,.06);">'
-      +'<div style="font-size:13px;font-weight:800;color:#1a3a6b;margin-bottom:12px;">'+title+'</div>'
-      +'<div style="position:relative;height:'+(h||220)+'px;"><canvas id="'+cid+'"></canvas></div></div>';
-  }
-
-  var html='<div style="max-width:540px;margin:0 auto;padding:16px;font-family:Pretendard,sans-serif;">';
-  // 헤더
-  html+='<div style="background:linear-gradient(135deg,#1a3a6b,#2557a7);border-radius:16px;padding:22px;color:#fff;margin-bottom:14px;box-shadow:0 6px 18px rgba(26,58,107,.25);">'
-    +'<div style="font-size:11px;opacity:.85;letter-spacing:.5px;">HIGH-ONE 수학학원 · 성적 분석 리포트</div>'
-    +'<div style="font-size:24px;font-weight:900;margin:5px 0;">'+escHtml(s.n)+' 학생</div>'
-    +'<div style="font-size:12px;opacity:.85;">'+escHtml(s.g||'')+(s.sc?' · '+escHtml(s.sc):'')+'</div></div>';
-  // 종합 요약
-  html+='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px;">'
-    +'<div style="background:#fff;border-radius:12px;padding:14px 6px;text-align:center;box-shadow:0 2px 10px rgba(0,0,0,.06);"><div style="font-size:20px;font-weight:900;color:#2557a7;">'+ks.length+'<span style="font-size:11px;color:#aaa;">회</span></div><div style="font-size:10px;color:#888;margin-top:3px;">응시 시험</div></div>'
-    +'<div style="background:#fff;border-radius:12px;padding:14px 6px;text-align:center;box-shadow:0 2px 10px rgba(0,0,0,.06);"><div style="font-size:22px;font-weight:900;color:'+lv.color+';">'+pct+'<span style="font-size:12px;">%</span></div><div style="font-size:10px;color:#888;margin-top:3px;">종합 정답률</div></div>'
-    +'<div style="background:#fff;border-radius:12px;padding:14px 6px;text-align:center;box-shadow:0 2px 10px rgba(0,0,0,.06);"><div style="font-size:18px;font-weight:900;color:#10b981;">'+tok+'<span style="font-size:11px;color:#aaa;">/'+tq+'</span></div><div style="font-size:10px;color:#888;margin-top:3px;">맞은 문항</div></div>'
-    +'<div style="background:#fff;border-radius:12px;padding:14px 6px;text-align:center;box-shadow:0 2px 10px rgba(0,0,0,.06);"><div style="font-size:13px;font-weight:900;color:'+lv.color+';margin-top:3px;">'+escHtml(lv.title)+'</div><div style="font-size:10px;color:#888;margin-top:4px;">성취 수준</div></div></div>';
-
-  // 그래프 (캔버스) — 개인분석 출력과 동일한 그리드 배치
-  var ghtml='';
-  function gbox(title,cid,h){
-    return '<div style="border:1px solid #e2e8f0;border-radius:8px;padding:10px;background:#fff;">'
-      +'<div style="font-size:11px;font-weight:800;color:#475569;margin-bottom:6px;">'+title+'</div>'
-      +'<div style="position:relative;height:'+(h||180)+'px;"><canvas id="'+cid+'"></canvas></div></div>';
-  }
-  // 1행 (2칸): 회차별 추이 + 단원별 정답률
-  var row1='';
-  if(trend.length) row1+=gbox('📈 회차별 성적 추이','pr_trend',180);
-  if(unitArr.length) row1+=gbox('📊 단원별 정답률','pr_unit',Math.max(160,unitArr.length*30));
-  // 2행 (2칸): 레이더 + 유형 도넛
-  var row2='';
-  if(unitArr.length>=3) row2+=gbox('🕸️ 단원별 레이더','pr_radar',220);
-  if(typeArr.length && !(typeArr.length===1 && typeArr[0].type==='기타')) row2+=gbox('🍰 문항 유형별 정답률','pr_type',220);
-  // 3행 (난이도): 난이도별 정오답
-  var row3='';
-  if(hasDiff) row3+=gbox('🎯 난이도별 정오답','pr_diff',180);
-
-  if(row1||row2||row3){
-    ghtml='<div style="background:#fff;border-radius:14px;padding:16px;margin-bottom:12px;box-shadow:0 2px 10px rgba(0,0,0,.06);">'
-      +'<div style="font-size:13px;font-weight:800;color:#1a3a6b;margin-bottom:12px;">📊 분석 그래프</div>';
-    if(row1) ghtml+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">'+row1+'</div>';
-    if(row2) ghtml+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">'+row2+'</div>';
-    if(row3) ghtml+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">'+row3+'</div>';
-    ghtml+='</div>';
-  }
-  html+=ghtml;
-
-  // 소단원별 통합 분석표 (개인분석지와 동일)
-  if(unitArr.length){
-    var tbl='<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:11px;">'
-      +'<thead><tr style="background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;">'
-      +'<th style="padding:8px 6px;text-align:left;border-radius:6px 0 0 0;">소단원</th>'
-      +'<th style="padding:8px 6px;text-align:center;">정답률</th>'
-      +'<th style="padding:8px 6px;text-align:center;">정답/오답</th>'
-      +'<th style="padding:8px 6px;text-align:center;border-radius:0 6px 0 0;">달성도</th></tr></thead><tbody>';
-    // unitArr는 취약순 정렬 → 표는 정답률 높은순으로 보기 좋게
-    var unitForTable = unitArr.slice().sort(function(a,b){return b.pct-a.pct;});
-    unitForTable.forEach(function(u){
-      var col=barColor(u.pct);
-      tbl+='<tr style="border-bottom:1px solid #f1f5f9;">'
-        +'<td style="padding:8px 6px;font-weight:600;color:#334155;">'+escHtml(u.unit)+'</td>'
-        +'<td style="padding:8px 6px;text-align:center;font-weight:800;color:'+col+';">'+u.pct+'%</td>'
-        +'<td style="padding:8px 6px;text-align:center;color:#64748b;">'+u.ok+'/'+u.tot+'</td>'
-        +'<td style="padding:8px 6px;"><div style="background:#eef1f6;border-radius:20px;height:7px;overflow:hidden;min-width:50px;"><div style="width:'+u.pct+'%;height:100%;background:'+col+';border-radius:20px;"></div></div></td>'
-        +'</tr>';
-    });
-    tbl+='</tbody></table></div>';
-    html+=card('📋 소단원별 통합 분석표', tbl);
-  }
-
-  // 약점 공략법
-  try{ var tips=buildPrintTypeTips(wrongItems); if(tips) html+=card('🎯 유형별 약점 공략법', tips); }catch(e){}
-
-  // 시험별 상세
-  var detail='';
-  ks.forEach(function(k){
-    var ex=exams[k],ans=scores[k]||[],ok=0,tot=(ex.questions||[]).length;
-    (ex.questions||[]).forEach(function(q,i){if(ans[i])ok++;});
-    var p=tot?Math.round(ok/tot*100):0,lv2=getLvInfo(p);
-    var wr=[];(ex.questions||[]).forEach(function(q,i){if(!ans[i])wr.push((i+1)+'번'+(q.unit?' ('+escHtml(q.unit)+')':''));});
-    detail+='<div style="border:1px solid #eef1f6;border-radius:10px;padding:12px;margin-bottom:8px;">'
-      +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:7px;"><span style="font-size:12px;font-weight:800;color:#333;">'+escHtml(EXAM_LABEL[k]||k)+'</span>'
-      +'<span style="font-size:18px;font-weight:900;color:'+lv2.color+';">'+p+'% <span style="font-size:11px;color:#bbb;">'+ok+'/'+tot+'</span></span></div>'
-      +'<div style="background:#eef1f6;border-radius:20px;height:7px;overflow:hidden;"><div style="width:'+p+'%;height:100%;background:'+lv2.color+';border-radius:20px;"></div></div>'
-      +(wr.length?'<div style="margin-top:8px;font-size:11px;color:#777;line-height:1.6;"><b style="color:#ef4444;">틀린 문항:</b> '+wr.join(', ')+'</div>':'<div style="margin-top:8px;font-size:11px;color:#10b981;font-weight:700;">✓ 전 문항 정답</div>')
-      +'</div>';
-  });
-  html+=card('📝 시험별 상세', detail);
-
-  // 종합 소견
-  var overall='';
-  try{ var lk=ks[ks.length-1]; overall=buildEnhancedOverall(exams[lk], scores[lk], s, pct, lv); }
-  catch(e){
-    var weak=unitArr.filter(function(u){return u.pct<60;}).slice(0,3).map(function(u){return u.unit;});
-    overall=(pct>=80?escHtml(s.n)+' 학생은 전반적으로 우수한 성취를 보이고 있습니다. ':pct>=60?escHtml(s.n)+' 학생은 기본 개념은 잘 이해하고 있으나 응용력을 키울 필요가 있습니다. ':escHtml(s.n)+' 학생은 기초 개념 보완이 필요합니다. ')+(weak.length?weak.join(', ')+' 단원의 추가 학습을 권장합니다.':'');
-  }
-  html+='<div style="background:linear-gradient(135deg,#eef2ff,#e0e7ff);border-radius:14px;padding:16px;margin:14px 0;border:1px solid #c7d2fe;"><div style="font-size:12px;font-weight:800;color:#3730a3;margin-bottom:8px;">📝 종합 소견</div><div style="font-size:12px;color:#4338ca;line-height:1.8;">'+overall+'</div></div>';
-  html+='<div style="text-align:center;font-size:10px;color:#bbb;padding:16px;">ⓒ HIGH-ONE 수학학원 · 성적 분석 리포트</div></div>';
-
-  // 오버레이에 표시 (보이는 화면)
-  var ov=_reportOverlay(html);
-  ov.style.cssText='position:fixed;inset:0;z-index:99999;overflow:auto;background:#f5f7fb;';
-  window.scrollTo(0,0);
-
-  // ── Chart.js로 직접 그리기 (오버레이는 화면에 보이므로 정상 렌더됨) ──
+  // 5) canvas에 직접 그래프 그림
   setTimeout(function(){
     if(typeof Chart==='undefined'){ console.warn('Chart.js 미로드'); return; }
     function bc(p){return p>=70?'rgba(16,185,129,.75)':p>=50?'rgba(245,158,11,.75)':'rgba(244,63,94,.75)';}
-    try{
-      if(trend.length && document.getElementById('pr_trend')){
-        new Chart(document.getElementById('pr_trend').getContext('2d'),{
-          type:'line',
-          data:{labels:trend.map(function(t){return t.label;}),datasets:[{label:'정답률(%)',data:trend.map(function(t){return t.pct;}),borderColor:'#7c3aed',backgroundColor:'rgba(124,58,237,.1)',pointBackgroundColor:'#7c3aed',pointRadius:5,borderWidth:2,tension:.3,fill:true}]},
-          options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{min:0,max:100,ticks:{callback:function(v){return v+'%';}}}}}
-        });
-      }
-      if(unitArr.length && document.getElementById('pr_unit')){
-        new Chart(document.getElementById('pr_unit').getContext('2d'),{
-          type:'bar',
-          data:{labels:unitArr.map(function(u){return u.unit;}),datasets:[{label:'정답률(%)',data:unitArr.map(function(u){return u.pct;}),backgroundColor:unitArr.map(function(u){return bc(u.pct);}),borderRadius:5}]},
-          options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{min:0,max:100,ticks:{callback:function(v){return v+'%';}}}}}
-        });
-      }
-      if(unitArr.length>=3 && document.getElementById('pr_radar')){
-        new Chart(document.getElementById('pr_radar').getContext('2d'),{
-          type:'radar',
-          data:{labels:unitArr.map(function(u){return u.unit;}),datasets:[{label:'정답률(%)',data:unitArr.map(function(u){return u.pct;}),backgroundColor:'rgba(37,87,167,0.15)',borderColor:'rgba(37,87,167,0.8)',borderWidth:2,pointRadius:3}]},
-          options:{responsive:true,maintainAspectRatio:false,scales:{r:{min:0,max:100,ticks:{stepSize:25,font:{size:9},callback:function(v){return v+'%';}},pointLabels:{font:{size:10,weight:'600'}}}},plugins:{legend:{display:false}}}
-        });
-      }
-      if(typeArr.length && document.getElementById('pr_type')){
-        new Chart(document.getElementById('pr_type').getContext('2d'),{
-          type:'doughnut',
-          data:{labels:typeArr.map(function(t){return t.type+' ('+t.pct+'%)';}),datasets:[{data:typeArr.map(function(t){return t.pct;}),backgroundColor:['#7c3aed','#ec4899','#f59e0b','#10b981','#3b82f6','#0ea5e9','#6b7280'],borderWidth:2}]},
-          options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:10}}}}}
-        });
-      }
-      // 난이도별 정오답 (개인분석과 동일: 정답/오답 누적 막대)
-      if(hasDiff && document.getElementById('pr_diff')){
-        var dOk=diffOrder.map(function(d){return diffMap[d].ok;});
-        var dNo=diffOrder.map(function(d){return diffMap[d].tot-diffMap[d].ok;});
-        new Chart(document.getElementById('pr_diff').getContext('2d'),{
-          type:'bar',
-          data:{labels:diffOrder,datasets:[
-            {label:'정답',data:dOk,backgroundColor:'rgba(16,185,129,.75)'},
-            {label:'오답',data:dNo,backgroundColor:'rgba(244,63,94,.75)'}
-          ]},
-          options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:10}}}},scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true}}}
-        });
-      }
-      console.log('[학부모리포트] 그래프 직접 렌더 완료');
-    }catch(e){ console.warn('[학부모리포트] 그래프 렌더 오류:', e.message); }
-  }, 100);
+    function mk(id,cfg){ var el=document.getElementById(id); if(el) try{ new Chart(el.getContext('2d'),cfg); }catch(e){} }
+    // 회차별 추이 (line)
+    mk('pcv_trend',{type:'line',data:{labels:trend.map(function(t){return t.label;}),datasets:[{label:'정답률(%)',data:trend.map(function(t){return t.pct;}),borderColor:'#7c3aed',backgroundColor:'rgba(124,58,237,.1)',pointBackgroundColor:'#7c3aed',pointRadius:4,borderWidth:2,tension:.3,fill:true}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{min:0,max:100,ticks:{callback:function(v){return v+'%';}}}}}});
+    // 단원별 정답률 (가로 막대)
+    mk('pcv_unit',{type:'bar',data:{labels:unitArr.map(function(u){return u.unit;}),datasets:[{data:unitArr.map(function(u){return u.pct;}),backgroundColor:unitArr.map(function(u){return bc(u.pct);}),borderRadius:4}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{min:0,max:100,ticks:{callback:function(v){return v+'%';}}}}}});
+    // 난이도별 정오답 (누적 막대)
+    var dOk=diffOrder.map(function(d){return diffMap[d].ok;}), dNo=diffOrder.map(function(d){return diffMap[d].tot-diffMap[d].ok;});
+    mk('pcv_diff',{type:'bar',data:{labels:diffOrder,datasets:[{label:'정답',data:dOk,backgroundColor:'rgba(16,185,129,.75)'},{label:'오답',data:dNo,backgroundColor:'rgba(244,63,94,.75)'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:10}}}},scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true}}}});
+    // 오답 유형 분포 (도넛)
+    mk('pcv_type',{type:'doughnut',data:{labels:typeArr.map(function(t){return t.type;}),datasets:[{data:typeArr.map(function(t){return t.pct;}),backgroundColor:['#7c3aed','#ec4899','#f59e0b','#10b981','#3b82f6','#0ea5e9','#6b7280'],borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:10}}}}}});
+    // 문항 유형별 정답률 (막대)
+    mk('pcv_cog',{type:'bar',data:{labels:typeArr.map(function(t){return t.type;}),datasets:[{data:typeArr.map(function(t){return t.pct;}),backgroundColor:typeArr.map(function(t){return bc(t.pct);}),borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{min:0,max:100,ticks:{callback:function(v){return v+'%';}}}}}});
+    // 단원별 레이더
+    mk('pcv_radar',{type:'radar',data:{labels:unitArr.map(function(u){return u.unit;}),datasets:[{data:unitArr.map(function(u){return u.pct;}),backgroundColor:'rgba(37,87,167,0.15)',borderColor:'rgba(37,87,167,0.8)',borderWidth:2,pointRadius:3}]},options:{responsive:true,maintainAspectRatio:false,scales:{r:{min:0,max:100,ticks:{stepSize:25,font:{size:9}},pointLabels:{font:{size:9,weight:'600'}}}},plugins:{legend:{display:false}}}});
+    // 학생 위치 분석(norm)은 전체 분포 데이터가 없어 생략 (canvas는 빈 채로 둠)
+    console.log('[학부모리포트] 그래프 렌더 완료');
+  }, 120);
 }
+
 
 
 
