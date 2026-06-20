@@ -1776,6 +1776,24 @@ GRADE_LIST.forEach(function(g){
   });
 });
 
+// 시험 키를 회차(N회) 오름차순으로 정렬 (1회 → 2회 → 3회 ...)
+function sortExamKeysByRound(keys){
+  function roundNum(k){
+    var m=(''+k).match(/(\d+)\s*회/);
+    if(m) return parseInt(m[1],10);
+    // '회'가 없으면 라벨에서 시도
+    var lbl=EXAM_LABEL[k]||'';
+    var m2=lbl.match(/(\d+)\s*회/);
+    return m2?parseInt(m2[1],10):9999;
+  }
+  return keys.slice().sort(function(a,b){
+    var ra=roundNum(a), rb=roundNum(b);
+    if(ra!==rb) return ra-rb;
+    // 회차가 같으면 키 문자열 순
+    return (''+a).localeCompare(''+b);
+  });
+}
+
 
 // 학년 → 학년키 역매핑
 var GRADE_KEY_MAP = {
@@ -4827,6 +4845,8 @@ function runPersonalAnalysis(){
       return DB.exams[k];
     });
   }
+  // 회차(1회→2회→...) 순으로 정렬
+  examKeys = sortExamKeysByRound(examKeys);
 
   if(examKeys.length===0){
     anaPersonalResult.style.display = 'none';
@@ -4863,6 +4883,19 @@ function runPersonalAnalysis(){
    +'<div class="sc '+lv.cc+'"><div class="scl">성취 수준</div><div class="scv" style="font-size:16px;">'+lv.title+'</div></div>';
 
   // ── 성장 추이 차트 ──
+  // 각 시험을 본 학원 전체 학생의 평균 정답률 계산
+  var trendAvg = examKeys.map(function(k){
+    var ex=DB.exams[k];
+    var sum=0,cnt=0;
+    DB.students.forEach(function(st){
+      var sc=DB.scores[st.id] && DB.scores[st.id][k];
+      if(sc && sc.length){
+        var ok=sc.filter(Boolean).length;
+        sum += Math.round(ok/ex.total*100); cnt++;
+      }
+    });
+    return cnt>0?Math.round(sum/cnt):null;
+  });
   destroyChart('trendChart');
   var tc = document.getElementById('trendChart').getContext('2d');
   chartInstances['trendChart'] = new Chart(tc,{
@@ -4870,14 +4903,19 @@ function runPersonalAnalysis(){
     data:{
       labels: trendLabels,
       datasets:[{
-        label:'정답률(%)',
+        label:'학생 정답률(%)',
         data: trendData,
         borderColor:'#7c3aed',backgroundColor:'rgba(124,58,237,.1)',
         pointBackgroundColor:'#7c3aed',pointRadius:5,tension:.3,fill:true
+      },{
+        label:'전체 평균(%)',
+        data: trendAvg,
+        borderColor:'#94a3b8',backgroundColor:'transparent',
+        borderDash:[5,4],pointBackgroundColor:'#94a3b8',pointRadius:3,tension:.3,fill:false
       }]
     },
     options:{responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{display:false}},
+      plugins:{legend:{display:true,position:'bottom',labels:{font:{size:10},boxWidth:18}}},
       scales:{y:{min:0,max:100,ticks:{callback:function(v){return v+'%';}}}}}
   });
 
@@ -6207,11 +6245,21 @@ function genShareLink(){
   document.querySelectorAll('.share-cb:checked').forEach(function(cb){sel.push(cb.value);});
   if(!sel.length){toast('시험을 선택하세요','ng');return;}
   var pw=(s.parentPhone||'').slice(-4); // 보호자 연락처 뒷 4자리
-  var d={s:{id:s.id,n:s.name,g:s.grade||'',sc:s.school||''},e:{},sc:{}};
+  var d={s:{id:s.id,n:s.name,g:s.grade||'',sc:s.school||''},e:{},sc:{},avg:{}};
   if(pw) d.pw=pw; // 암호 설정 (있을 때만)
   sel.forEach(function(k){
     if(DB.exams[k])d.e[k]=DB.exams[k];
     if(DB.scores[sid]&&DB.scores[sid][k])d.sc[k]=DB.scores[sid][k];
+    // 해당 시험을 본 학원 전체 평균 정답률(숫자만, 개인정보 없음)
+    var ex=DB.exams[k];
+    if(ex){
+      var sum=0,cnt=0;
+      DB.students.forEach(function(st){
+        var sc=DB.scores[st.id] && DB.scores[st.id][k];
+        if(sc && sc.length){ sum+=Math.round(sc.filter(Boolean).length/ex.total*100); cnt++; }
+      });
+      d.avg[k]= cnt>0?Math.round(sum/cnt):null;
+    }
   });
 
   if(!window.fb){ toast('서버 연결 준비 중입니다. 잠시 후 다시 시도하세요','ng',4000); return; }
@@ -6486,6 +6534,8 @@ function renderParentReport(data){
   // 개인분석지(printPersonalInNewWindow)를 그대로 사용해 100% 동일한 화면 생성.
   // 그래프는 캡처 대신 빈 canvas로 받아, 학부모 화면에서 직접 Chart.js로 그린다.
   var s=data.s, exams=data.e||{}, scores=data.sc||{}, ks=Object.keys(exams);
+  // 회차(1회→2회→...) 순으로 정렬
+  if(typeof sortExamKeysByRound==='function') ks=sortExamKeysByRound(ks);
 
   // 1) 임시 DB 주입 (개인분석지 함수가 DB를 참조하므로)
   if(typeof DB==='undefined' || !DB){ window.DB={students:[],exams:{},scores:{},pdfFlags:{},teachers:[]}; }
@@ -6534,10 +6584,11 @@ function renderParentReport(data){
   window.scrollTo(0,0);
 
   // 4) 그래프 데이터 집계 (개인분석과 동일 로직)
+  var avgMap=data.avg||{};
   var trend=ks.map(function(k){
     var ex=exams[k],ans=scores[k]||[],ok=0,tot=(ex.questions||[]).length;
     (ex.questions||[]).forEach(function(q,i){if(ans[i])ok++;});
-    return{label:EXAM_LABEL[k]||k,ok:ok,tot:tot,pct:tot?Math.round(ok/tot*100):0};
+    return{label:EXAM_LABEL[k]||k,ok:ok,tot:tot,pct:tot?Math.round(ok/tot*100):0,avg:(avgMap[k]!=null?avgMap[k]:null)};
   });
   var unitMap={};
   ks.forEach(function(k){(exams[k].questions||[]).forEach(function(q,i){
@@ -6570,7 +6621,7 @@ function renderParentReport(data){
     function bc(p){return p>=70?'rgba(16,185,129,.75)':p>=50?'rgba(245,158,11,.75)':'rgba(244,63,94,.75)';}
     function mk(id,cfg){ var el=document.getElementById(id); if(el) try{ new Chart(el.getContext('2d'),cfg); }catch(e){} }
     // 회차별 추이 (line)
-    mk('pcv_trend',{type:'line',data:{labels:trend.map(function(t){return t.label;}),datasets:[{label:'정답률(%)',data:trend.map(function(t){return t.pct;}),borderColor:'#7c3aed',backgroundColor:'rgba(124,58,237,.1)',pointBackgroundColor:'#7c3aed',pointRadius:4,borderWidth:2,tension:.3,fill:true}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{min:0,max:100,ticks:{callback:function(v){return v+'%';}}}}}});
+    mk('pcv_trend',{type:'line',data:{labels:trend.map(function(t){return t.label;}),datasets:[{label:'학생 정답률(%)',data:trend.map(function(t){return t.pct;}),borderColor:'#7c3aed',backgroundColor:'rgba(124,58,237,.1)',pointBackgroundColor:'#7c3aed',pointRadius:4,borderWidth:2,tension:.3,fill:true},{label:'전체 평균(%)',data:trend.map(function(t){return t.avg;}),borderColor:'#94a3b8',backgroundColor:'transparent',borderDash:[5,4],pointBackgroundColor:'#94a3b8',pointRadius:3,borderWidth:2,tension:.3,fill:false}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,position:'bottom',labels:{font:{size:9},boxWidth:16}}},scales:{y:{min:0,max:100,ticks:{callback:function(v){return v+'%';}}}}}});
     // 단원별 정답률 (가로 막대)
     mk('pcv_unit',{type:'bar',data:{labels:unitArr.map(function(u){return u.unit;}),datasets:[{data:unitArr.map(function(u){return u.pct;}),backgroundColor:unitArr.map(function(u){return bc(u.pct);}),borderRadius:4}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{min:0,max:100,ticks:{callback:function(v){return v+'%';}}}}}});
     // 난이도별 정오답 (누적 막대)
