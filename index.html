@@ -6530,6 +6530,11 @@ function renderParentReport(data){
   // 5) canvas에 직접 그래프 그림
   setTimeout(function(){
     if(typeof Chart==='undefined'){ console.warn('Chart.js 미로드'); return; }
+    // norm 차트 등에서 쓰는 종합 정답률/성취수준 계산
+    var _tok=0,_tq=0;
+    ks.forEach(function(k){(exams[k].questions||[]).forEach(function(q,i){_tq++;if((scores[k]||[])[i])_tok++;});});
+    var pct=_tq?Math.round(_tok/_tq*100):0;
+    var lv=getLvInfo(pct);
     function bc(p){return p>=70?'rgba(16,185,129,.75)':p>=50?'rgba(245,158,11,.75)':'rgba(244,63,94,.75)';}
     function mk(id,cfg){ var el=document.getElementById(id); if(el) try{ new Chart(el.getContext('2d'),cfg); }catch(e){} }
     // 회차별 추이 (line)
