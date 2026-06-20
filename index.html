@@ -5644,6 +5644,17 @@ function printPersonalInNewWindow(sid, examKeys, chartImages, returnHtmlOnly){
           if(canvasMode){
             // 학부모용: 빈 canvas (나중에 직접 그림). 데이터 없으면 표시 안 함은 호출측에서 결정
             var cid=cidMap[title];
+            if(cid==='pcv_norm'){
+              // 위치 분석: 곡선 + 우측 정보박스 (개인분석지와 동일 구조)
+              return '<div style="border:1px solid #e2e8f0;border-radius:8px;padding:10px;background:#fff;">'
+                +'<div style="font-size:11px;font-weight:800;color:#475569;margin-bottom:6px;">'+title+'</div>'
+                +'<div style="display:grid;grid-template-columns:1fr 160px;gap:10px;align-items:center;">'
+                +'<div style="position:relative;height:200px;"><canvas id="pcv_norm"></canvas></div>'
+                +'<div id="pcv_norm_info"></div>'
+                +'</div>'
+                +'<div style="font-size:9px;color:#94a3b8;text-align:center;margin-top:6px;">※ 누적데이터(평균 60점, 표준편차 18점)를 기준으로 학생의 예상 위치를 통계적으로 분석한 결과입니다.</div>'
+                +'</div>';
+            }
             return '<div style="border:1px solid #e2e8f0;border-radius:8px;padding:10px;background:#fff;">'
               +'<div style="font-size:11px;font-weight:800;color:#475569;margin-bottom:6px;">'+title+'</div>'
               +'<div style="position:relative;height:180px;"><canvas id="'+cid+'"></canvas></div>'
@@ -6466,11 +6477,24 @@ function renderParentReport(data){
   }
   // 자동 인쇄 스크립트 제거
   htmlOut = htmlOut.replace(/<script>[\s\S]*?<\/script>/g,'');
-  // <body> 내용 + <style> 추출
-  var bodyMatch = htmlOut.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
-  var bodyInner = bodyMatch ? bodyMatch[1] : htmlOut;
-  var styleMatch = htmlOut.match(/<style[^>]*>([\s\S]*?)<\/style>/i);
-  var styleTag = styleMatch ? '<style>'+styleMatch[1]+'</style>' : '';
+  // <body> 내용 추출 (정규식 non-greedy가 중간에 끊기는 문제 방지 → indexOf로 정확히 자름)
+  var bodyInner;
+  var bStart = htmlOut.indexOf('<body');
+  if(bStart>-1){
+    bStart = htmlOut.indexOf('>', bStart)+1;
+    var bEnd = htmlOut.lastIndexOf('</body>'); // 마지막 </body>까지 (잘림 방지)
+    bodyInner = (bEnd>bStart) ? htmlOut.substring(bStart, bEnd) : htmlOut.substring(bStart);
+  } else {
+    bodyInner = htmlOut;
+  }
+  var styleInner='';
+  var sStart = htmlOut.indexOf('<style');
+  if(sStart>-1){
+    sStart = htmlOut.indexOf('>', sStart)+1;
+    var sEnd = htmlOut.indexOf('</style>', sStart);
+    if(sEnd>sStart) styleInner = htmlOut.substring(sStart, sEnd);
+  }
+  var styleTag = styleInner ? '<style>'+styleInner+'</style>' : '';
 
   // 3) 오버레이에 표시 (보이는 화면)
   var ov=_reportOverlay(styleTag+'<div style="background:#fff;min-height:100vh;">'+bodyInner+'</div>');
@@ -6521,6 +6545,37 @@ function renderParentReport(data){
     mk('pcv_cog',{type:'bar',data:{labels:typeArr.map(function(t){return t.type;}),datasets:[{data:typeArr.map(function(t){return t.pct;}),backgroundColor:typeArr.map(function(t){return bc(t.pct);}),borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{min:0,max:100,ticks:{callback:function(v){return v+'%';}}}}}});
     // 단원별 레이더
     mk('pcv_radar',{type:'radar',data:{labels:unitArr.map(function(u){return u.unit;}),datasets:[{data:unitArr.map(function(u){return u.pct;}),backgroundColor:'rgba(37,87,167,0.15)',borderColor:'rgba(37,87,167,0.8)',borderWidth:2,pointRadius:3}]},options:{responsive:true,maintainAspectRatio:false,scales:{r:{min:0,max:100,ticks:{stepSize:25,font:{size:9}},pointLabels:{font:{size:9,weight:'600'}}}},plugins:{legend:{display:false}}}});
+    // 누적데이터 기준 학생 위치 분석 (개인분석지 renderNormChart와 동일)
+    if(document.getElementById('pcv_norm')){
+      var mu=60, sigma=18;
+      var xArr=[],yArr=[];
+      for(var x=0;x<=100;x+=2){
+        xArr.push(x);
+        var yv=300*(1/(sigma*Math.sqrt(2*Math.PI)))*Math.exp(-0.5*Math.pow((x-mu)/sigma,2))*2;
+        yArr.push(parseFloat(yv.toFixed(2)));
+      }
+      mk('pcv_norm',{
+        type:'line',
+        data:{labels:xArr,datasets:[
+          {label:'누적데이터 분포',data:yArr,borderColor:'rgba(124,58,237,.5)',backgroundColor:'rgba(124,58,237,.07)',fill:true,tension:.4,pointRadius:0},
+          {label:'현재 위치',data:xArr.map(function(x){return x===Math.round(pct/2)*2?yArr[Math.round(pct/2)]||0:null;}),borderColor:'#ec4899',backgroundColor:'#ec4899',pointRadius:8,pointStyle:'triangle',showLine:false}
+        ]},
+        options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:9}}},tooltip:{callbacks:{label:function(ctx){return ctx.datasetIndex===1?'현재 '+pct+'%':'';}}}},scales:{x:{title:{display:true,text:'정답률 (%)',font:{size:9}},ticks:{font:{size:8}}},y:{display:false}}}
+      });
+      // 정보 박스
+      var infoEl=document.getElementById('pcv_norm_info');
+      if(infoEl && typeof normCDF==='function'){
+        var rank=Math.round((1-normCDF(pct,mu,sigma))*300); rank=Math.max(1,Math.min(300,rank));
+        var percentile=Math.round(normCDF(pct,mu,sigma)*100);
+        infoEl.innerHTML='<div style="font-size:12px;font-weight:800;margin-bottom:8px;color:#7c3aed;">📍 누적데이터 분석 정보</div>'
+          +'<div style="display:flex;flex-direction:column;gap:6px;">'
+          +'<div><span style="font-size:10px;color:#94a3b8;">현재 정답률</span><br><span style="font-size:18px;font-weight:900;color:#7c3aed;">'+pct+'%</span></div>'
+          +'<div><span style="font-size:10px;color:#94a3b8;">누적데이터 기준 예상 순위</span><br><span style="font-size:16px;font-weight:900;color:'+lv.color+';">'+rank+'위</span></div>'
+          +'<div><span style="font-size:10px;color:#94a3b8;">상위 백분위</span><br><span style="font-size:16px;font-weight:900;color:#10b981;">'+(100-percentile)+'%</span></div>'
+          +'<div><span style="font-size:10px;color:#94a3b8;">성취 수준</span><br><span style="font-size:13px;font-weight:800;">'+escHtml(lv.title)+'</span></div>'
+          +'</div>';
+      }
+    }
     // 학생 위치 분석(norm)은 전체 분포 데이터가 없어 생략 (canvas는 빈 채로 둠)
     console.log('[학부모리포트] 그래프 렌더 완료');
   }, 120);
