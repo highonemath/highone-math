@@ -6429,6 +6429,7 @@ function showReportPasswordGate(data){
 }
 
 function renderParentReport(data){
+  console.log('[학부모리포트] renderParentReport 진입');
   // 개인분석 출력과 100% 동일한 분석지를 학부모에게 표시
   // 방법: 공유 데이터를 임시로 DB에 주입 → 개인분석 실행 → 동일 HTML 생성 → 현재 창에 표시
   var s=data.s, exams=data.e||{}, scores=data.sc||{}, ks=Object.keys(exams);
@@ -6476,31 +6477,53 @@ function renderParentReport(data){
   }
 
   // 3) 차트 생성 시도 (개인분석 화면이 있을 때만)
+  console.log('[학부모리포트] s4:', !!s4, 'anaStudent:', !!anaStudent, 'runPersonalAnalysis:', typeof runPersonalAnalysis, 'captureAnalysisCharts:', typeof captureAnalysisCharts);
   if(s4 && anaStudent && typeof runPersonalAnalysis==='function' && typeof captureAnalysisCharts==='function'){
     try{
       anaStudent.value=sid;
       if(typeof selectedAnaExams!=='undefined'){ selectedAnaExams={}; ks.forEach(function(k){selectedAnaExams[k]=true;}); }
-      // 차트 렌더를 위해 오버레이를 잠시 숨기고 s4 활성화
+      // ★ 핵심: 차트는 캔버스가 "실제로 화면에 보일 때"만 제대로 그려진다.
+      // 오버레이를 잠시 제거하고, s4를 화면 전체에 보이게 띄운 뒤 분석 실행.
       var ovTmp=document.getElementById('_reportOverlay');
       if(ovTmp) ovTmp.style.display='none';
+      var loEl=document.getElementById('loginOverlay'); if(loEl) loEl.style.display='none';
+      var appEl=document.getElementById('app'); if(appEl){ appEl.style.display=''; appEl.style.visibility='visible'; }
+      // 다른 활성 섹션 해제 후 s4만 활성화 + 화면 전체 강제 표시
       var prevAct=document.querySelector('.sec.act');
       if(prevAct) prevAct.classList.remove('act');
       s4.classList.add('act');
+      var s4prevStyle = s4.getAttribute('style')||'';
+      s4.style.cssText='display:block!important;visibility:visible!important;position:fixed;top:0;left:0;width:100%;height:auto;background:#fff;z-index:50000;opacity:1;overflow:auto;';
+      console.log('[학부모리포트] 분석 실행 시작, 시험수:', ks.length);
       runPersonalAnalysis();
-      setTimeout(function(){
-        var charts=null;
-        try{ charts=captureAnalysisCharts(); }catch(e){ charts=null; }
-        // s4 비활성화 + 오버레이 복구
-        s4.classList.remove('act');
-        if(prevAct) prevAct.classList.add('act');
-        if(ovTmp) ovTmp.style.display='';
-        buildAndShow(charts);
-      }, 750);
+      // 차트 렌더 완료를 기다렸다 캡처 (최대 5회 재시도)
+      var tryCount=0;
+      function attemptCapture(){
+        tryCount++;
+        var charts=null, nonEmpty=0;
+        try{
+          charts=captureAnalysisCharts();
+          nonEmpty = charts ? Object.keys(charts).filter(function(k){return charts[k] && charts[k].length>5000;}).length : 0;
+        }catch(e){ charts=null; }
+        console.log('[학부모리포트] 캡처 시도'+tryCount+', 유효 차트:', nonEmpty, '개');
+        if(nonEmpty>0 || tryCount>=5){
+          // s4 원복 + 오버레이 복구
+          s4.classList.remove('act');
+          s4.setAttribute('style', s4prevStyle);
+          if(prevAct) prevAct.classList.add('act');
+          if(ovTmp) ovTmp.style.display='';
+          buildAndShow(charts);
+        } else {
+          setTimeout(attemptCapture, 700); // 재시도
+        }
+      }
+      setTimeout(attemptCapture, 1000);
     }catch(e){
+      console.log('[학부모리포트] 분석 실행 오류:', e.message);
       buildAndShow(null);
     }
   } else {
-    // 개인분석 화면이 없으면 그래프 없이 표(분석지 양식)만이라도 동일하게
+    console.log('[학부모리포트] 분석 화면 없음 → 그래프 없이 표시');
     buildAndShow(null);
   }
 }
