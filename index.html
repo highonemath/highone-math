@@ -6465,6 +6465,17 @@ function renderParentReport(data){
   var wrongItems=[];
   ks.forEach(function(k){(exams[k].questions||[]).forEach(function(q,i){ if(!((scores[k]||[])[i])) wrongItems.push(q); });});
 
+  // 난이도별 집계 (하/중/상)
+  var diffOrder=['하','중','상'];
+  var diffMap={'하':{ok:0,tot:0},'중':{ok:0,tot:0},'상':{ok:0,tot:0}};
+  ks.forEach(function(k){(exams[k].questions||[]).forEach(function(q,i){
+    var d=q.diff||'';
+    if(d==='최하')d='하'; if(d==='최상')d='상';
+    if(!diffMap[d])return;
+    diffMap[d].tot++; if((scores[k]||[])[i])diffMap[d].ok++;
+  });});
+  var hasDiff = (diffMap['하'].tot+diffMap['중'].tot+diffMap['상'].tot)>0;
+
   function barColor(p){ return p>=80?'#10b981':p>=60?'#3b82f6':p>=40?'#f59e0b':'#ef4444'; }
   function card(title,inner){
     return '<div style="background:#fff;border-radius:14px;padding:16px;margin-bottom:12px;box-shadow:0 2px 10px rgba(0,0,0,.06);">'
@@ -6504,15 +6515,42 @@ function renderParentReport(data){
   var row2='';
   if(unitArr.length>=3) row2+=gbox('🕸️ 단원별 레이더','pr_radar',220);
   if(typeArr.length && !(typeArr.length===1 && typeArr[0].type==='기타')) row2+=gbox('🍰 문항 유형별 정답률','pr_type',220);
+  // 3행 (난이도): 난이도별 정오답
+  var row3='';
+  if(hasDiff) row3+=gbox('🎯 난이도별 정오답','pr_diff',180);
 
-  if(row1||row2){
+  if(row1||row2||row3){
     ghtml='<div style="background:#fff;border-radius:14px;padding:16px;margin-bottom:12px;box-shadow:0 2px 10px rgba(0,0,0,.06);">'
       +'<div style="font-size:13px;font-weight:800;color:#1a3a6b;margin-bottom:12px;">📊 분석 그래프</div>';
     if(row1) ghtml+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">'+row1+'</div>';
-    if(row2) ghtml+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">'+row2+'</div>';
+    if(row2) ghtml+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">'+row2+'</div>';
+    if(row3) ghtml+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">'+row3+'</div>';
     ghtml+='</div>';
   }
   html+=ghtml;
+
+  // 소단원별 통합 분석표 (개인분석지와 동일)
+  if(unitArr.length){
+    var tbl='<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:11px;">'
+      +'<thead><tr style="background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;">'
+      +'<th style="padding:8px 6px;text-align:left;border-radius:6px 0 0 0;">소단원</th>'
+      +'<th style="padding:8px 6px;text-align:center;">정답률</th>'
+      +'<th style="padding:8px 6px;text-align:center;">정답/오답</th>'
+      +'<th style="padding:8px 6px;text-align:center;border-radius:0 6px 0 0;">달성도</th></tr></thead><tbody>';
+    // unitArr는 취약순 정렬 → 표는 정답률 높은순으로 보기 좋게
+    var unitForTable = unitArr.slice().sort(function(a,b){return b.pct-a.pct;});
+    unitForTable.forEach(function(u){
+      var col=barColor(u.pct);
+      tbl+='<tr style="border-bottom:1px solid #f1f5f9;">'
+        +'<td style="padding:8px 6px;font-weight:600;color:#334155;">'+escHtml(u.unit)+'</td>'
+        +'<td style="padding:8px 6px;text-align:center;font-weight:800;color:'+col+';">'+u.pct+'%</td>'
+        +'<td style="padding:8px 6px;text-align:center;color:#64748b;">'+u.ok+'/'+u.tot+'</td>'
+        +'<td style="padding:8px 6px;"><div style="background:#eef1f6;border-radius:20px;height:7px;overflow:hidden;min-width:50px;"><div style="width:'+u.pct+'%;height:100%;background:'+col+';border-radius:20px;"></div></div></td>'
+        +'</tr>';
+    });
+    tbl+='</tbody></table></div>';
+    html+=card('📋 소단원별 통합 분석표', tbl);
+  }
 
   // 약점 공략법
   try{ var tips=buildPrintTypeTips(wrongItems); if(tips) html+=card('🎯 유형별 약점 공략법', tips); }catch(e){}
@@ -6579,6 +6617,19 @@ function renderParentReport(data){
           type:'doughnut',
           data:{labels:typeArr.map(function(t){return t.type+' ('+t.pct+'%)';}),datasets:[{data:typeArr.map(function(t){return t.pct;}),backgroundColor:['#7c3aed','#ec4899','#f59e0b','#10b981','#3b82f6','#0ea5e9','#6b7280'],borderWidth:2}]},
           options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:10}}}}}
+        });
+      }
+      // 난이도별 정오답 (개인분석과 동일: 정답/오답 누적 막대)
+      if(hasDiff && document.getElementById('pr_diff')){
+        var dOk=diffOrder.map(function(d){return diffMap[d].ok;});
+        var dNo=diffOrder.map(function(d){return diffMap[d].tot-diffMap[d].ok;});
+        new Chart(document.getElementById('pr_diff').getContext('2d'),{
+          type:'bar',
+          data:{labels:diffOrder,datasets:[
+            {label:'정답',data:dOk,backgroundColor:'rgba(16,185,129,.75)'},
+            {label:'오답',data:dNo,backgroundColor:'rgba(244,63,94,.75)'}
+          ]},
+          options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:10}}}},scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true}}}
         });
       }
       console.log('[학부모리포트] 그래프 직접 렌더 완료');
