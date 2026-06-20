@@ -974,6 +974,7 @@ body::before{content:'';position:fixed;inset:0;background:
 <p style="font-size:12px;color:var(--mu);margin-bottom:12px;">학생 선택 → 시험 선택 → 링크 생성 → 복사 후 발송. 학부모는 링크만으로 성적을 확인합니다.</p>
 <div style="max-width:520px;">
 <div>
+<div class="fg" id="shareTeacherWrap" style="display:none;"><label>담당 선생님</label><select id="shareTeacherSel" onchange="renderShareStudents()" style="padding:7px;border-radius:7px;border:1.5px solid var(--bo);font-size:12px;width:100%;"></select></div>
 <div class="fg"><label>학년 필터</label><select id="shareGradeFilter" onchange="renderShareStudents()" style="padding:7px;border-radius:7px;border:1.5px solid var(--bo);font-size:12px;width:100%;"></select></div>
 <div class="fg"><label>학생 선택</label><select id="shareStudentSel" onchange="onShareStudentChange()" style="padding:7px;border-radius:7px;border:1.5px solid var(--bo);font-size:12px;width:100%;"><option value="">-- 학생 선택 --</option></select></div>
 <div id="shareParentInfo" style="display:none;font-size:11px;padding:7px 10px;background:var(--pp);border-radius:7px;margin-bottom:10px;color:var(--pr);font-weight:700;"></div>
@@ -6070,6 +6071,28 @@ function initShareTab(){
   if(!g)return;
   g.innerHTML='<option value="">전체 학년</option>';
   GRADE_LIST.forEach(function(gr){g.innerHTML+='<option value="'+gr.key+'">'+gr.label+'</option>';});
+  // 선생님 선택: 관리자만 노출
+  var myName=(typeof getMyTeacherName==='function')?getMyTeacherName():null;
+  var tw=document.getElementById('shareTeacherWrap');
+  var ts=document.getElementById('shareTeacherSel');
+  if(tw && ts){
+    if(myName){
+      // 일반 선생님: 선생님 선택 숨김 (본인 반만)
+      tw.style.display='none';
+    } else {
+      // 관리자: 선생님 목록 노출
+      tw.style.display='';
+      ts.innerHTML='<option value="">전체 선생님</option>';
+      var teachers=(DB.teachers&&DB.teachers.length)?DB.teachers.slice():[];
+      // DB.teachers가 비어도 학생 데이터에서 선생님 수집
+      var fromStudents={};
+      DB.students.forEach(function(s){ if(s.teacher) fromStudents[s.teacher]=true; });
+      Object.keys(fromStudents).forEach(function(t){ if(teachers.indexOf(t)<0) teachers.push(t); });
+      teachers.sort();
+      teachers.forEach(function(t){ ts.innerHTML+='<option value="'+escHtml(t)+'">'+escHtml(t)+'</option>'; });
+      ts.innerHTML+='<option value="__none__">미지정</option>';
+    }
+  }
   renderShareStudents();
 }
 
@@ -6085,11 +6108,20 @@ function renderShareStudents(){
   var grade=document.getElementById('shareGradeFilter').value;
   var sel=document.getElementById('shareStudentSel');
   sel.innerHTML='<option value="">-- 학생 선택 --</option>';
-  // 권한: 일반 선생님은 본인 반만
+  // 권한: 일반 선생님은 본인 반만 / 관리자는 선택한 선생님으로 필터
   var myName=(typeof getMyTeacherName==='function')?getMyTeacherName():null;
+  var ts=document.getElementById('shareTeacherSel');
+  var pickTeacher=(!myName && ts)?ts.value:''; // 관리자가 고른 선생님
   DB.students.filter(function(s){
     if(grade && GRADE_KEY_MAP[s.grade]!==grade) return false;
-    if(myName && s.teacher!==myName) return false;
+    if(myName){
+      // 일반 선생님: 본인 반만
+      if(s.teacher!==myName) return false;
+    } else if(pickTeacher){
+      // 관리자: 선택한 선생님
+      if(pickTeacher==='__none__'){ if(s.teacher) return false; }
+      else if(s.teacher!==pickTeacher) return false;
+    }
     return true;
   }).forEach(function(s){
     sel.innerHTML+='<option value="'+s.id+'">'+escHtml(s.name)+' ('+escHtml(s.grade||'')+')'+(s.parentPhone?' 📞':'')+'</option>';
