@@ -6489,12 +6489,30 @@ function renderParentReport(data){
     +'<div style="background:#fff;border-radius:12px;padding:14px 6px;text-align:center;box-shadow:0 2px 10px rgba(0,0,0,.06);"><div style="font-size:18px;font-weight:900;color:#10b981;">'+tok+'<span style="font-size:11px;color:#aaa;">/'+tq+'</span></div><div style="font-size:10px;color:#888;margin-top:3px;">맞은 문항</div></div>'
     +'<div style="background:#fff;border-radius:12px;padding:14px 6px;text-align:center;box-shadow:0 2px 10px rgba(0,0,0,.06);"><div style="font-size:13px;font-weight:900;color:'+lv.color+';margin-top:3px;">'+escHtml(lv.title)+'</div><div style="font-size:10px;color:#888;margin-top:4px;">성취 수준</div></div></div>';
 
-  // 그래프 (캔버스)
-  html+='<div style="font-size:13px;font-weight:800;color:#1a3a6b;margin:6px 4px 10px;">📊 분석 그래프</div>';
-  if(trend.length) html+=chartCard('📈 회차별 성적 추이','pr_trend',220);
-  if(unitArr.length) html+=chartCard('📚 단원별 정답률','pr_unit',Math.max(200,unitArr.length*34));
-  if(unitArr.length>=3) html+=chartCard('🕸️ 단원별 성취 레이더','pr_radar',260);
-  if(typeArr.length && !(typeArr.length===1 && typeArr[0].type==='기타')) html+=chartCard('🍰 문항 유형별 정답률','pr_type',230);
+  // 그래프 (캔버스) — 개인분석 출력과 동일한 그리드 배치
+  var ghtml='';
+  function gbox(title,cid,h){
+    return '<div style="border:1px solid #e2e8f0;border-radius:8px;padding:10px;background:#fff;">'
+      +'<div style="font-size:11px;font-weight:800;color:#475569;margin-bottom:6px;">'+title+'</div>'
+      +'<div style="position:relative;height:'+(h||180)+'px;"><canvas id="'+cid+'"></canvas></div></div>';
+  }
+  // 1행 (2칸): 회차별 추이 + 단원별 정답률
+  var row1='';
+  if(trend.length) row1+=gbox('📈 회차별 성적 추이','pr_trend',180);
+  if(unitArr.length) row1+=gbox('📊 단원별 정답률','pr_unit',Math.max(160,unitArr.length*30));
+  // 2행 (2칸): 레이더 + 유형 도넛
+  var row2='';
+  if(unitArr.length>=3) row2+=gbox('🕸️ 단원별 레이더','pr_radar',220);
+  if(typeArr.length && !(typeArr.length===1 && typeArr[0].type==='기타')) row2+=gbox('🍰 문항 유형별 정답률','pr_type',220);
+
+  if(row1||row2){
+    ghtml='<div style="background:#fff;border-radius:14px;padding:16px;margin-bottom:12px;box-shadow:0 2px 10px rgba(0,0,0,.06);">'
+      +'<div style="font-size:13px;font-weight:800;color:#1a3a6b;margin-bottom:12px;">📊 분석 그래프</div>';
+    if(row1) ghtml+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">'+row1+'</div>';
+    if(row2) ghtml+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">'+row2+'</div>';
+    ghtml+='</div>';
+  }
+  html+=ghtml;
 
   // 약점 공략법
   try{ var tips=buildPrintTypeTips(wrongItems); if(tips) html+=card('🎯 유형별 약점 공략법', tips); }catch(e){}
