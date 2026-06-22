@@ -216,6 +216,7 @@ body::before{content:'';position:fixed;inset:0;background:
 .std-card:hover{border-color:rgba(99,102,241,.25);box-shadow:0 8px 24px rgba(79,70,229,.12);transform:translateY(-3px);}
 .std-card:hover::before{opacity:1;}
 .std-card.sel{border-color:var(--pr);background:rgba(99,102,241,.04);}
+.share-std-card:hover{border-color:rgba(124,58,237,.4)!important;box-shadow:0 6px 20px rgba(124,58,237,.15);}
 .std-num{position:absolute;top:9px;right:11px;font-size:10px;font-weight:800;color:var(--mu);background:#f8fafc;padding:1px 7px;border-radius:10px;}
 .std-name{font-size:14px;font-weight:800;color:var(--dk);margin-bottom:4px;margin-top:2px;}
 .std-info{font-size:11px;color:var(--mu);}
@@ -794,11 +795,6 @@ body::before{content:'';position:fixed;inset:0;background:
       <div id="anaWrongList" style="display:flex;flex-direction:column;gap:16px;"></div>
     </div>
 
-    <!-- 약점TIPS + 레이더 -->
-    <div class="card card-sm">
-      <div class="ct"><span class="ci">🎯</span> 유형별 약점 공략법</div>
-      <div id="anaTypeTips"></div>
-    </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
       <div class="card card-sm"><div class="ct"><span class="ci">🕸️</span> 단원별 레이더 (중단원)</div><div style="position:relative;height:200px;"><canvas id="anaRadarUnit"></canvas></div></div>
       <div class="card card-sm"><div class="ct"><span class="ci">📊</span> 유형별 정답률</div><div id="anaTypeBar" style="padding:4px 0;"></div></div>
@@ -820,45 +816,86 @@ body::before{content:'';position:fixed;inset:0;background:
 <!-- ============================= -->
 <div id="s5" class="sec">
   <div class="card card-sm no-print">
-    <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;">
-      <div class="fg" style="min-width:140px;"><label>학년 선택</label>
-        <select id="classGrade" onchange="onClassGradeChange()">
+    <div class="ct"><span class="ci">📊</span> 반 분석 조건 선택</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-bottom:14px;">
+      <!-- 선생님 선택 (관리자만 표시) -->
+      <div class="fg" id="classTeacherWrap" style="display:none;">
+        <label>담당 선생님</label>
+        <select id="classTeacher" onchange="onClassTeacherChange()" style="width:100%;">
+          <option value="">선생님 선택</option>
+        </select>
+      </div>
+      <!-- 학년 선택 -->
+      <div class="fg">
+        <label>학년</label>
+        <select id="classGrade" onchange="onClassGradeChange()" style="width:100%;">
           <option value="">학년 선택</option>
         </select>
       </div>
-      <div class="fg" style="min-width:180px;"><label>시험지 선택</label>
-        <select id="classExam" onchange="runClassAnalysis()">
-          <option value="">시험지 선택</option>
+      <!-- 시험 그룹 선택 -->
+      <div class="fg">
+        <label>시험 구분</label>
+        <select id="classGroup" onchange="onClassGroupChange()" style="width:100%;">
+          <option value="">시험 구분 선택</option>
         </select>
       </div>
+    </div>
+    <!-- 시험지(회차) 다중 선택 -->
+    <div id="classExamWrap" style="display:none;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
+        <label style="font-size:12px;font-weight:700;color:var(--dk);">📋 회차 선택</label>
+        <button class="btn btn-sm" onclick="classSelectAllExams()" style="font-size:10px;padding:3px 8px;">전체선택</button>
+        <button class="btn btn-sm" onclick="classDeselectAllExams()" style="font-size:10px;padding:3px 8px;">전체해제</button>
+        <span id="classExamSelCount" style="font-size:11px;color:var(--mu);margin-left:auto;"></span>
+      </div>
+      <div id="classExamList" style="display:flex;flex-wrap:wrap;gap:7px;"></div>
+    </div>
+    <div style="margin-top:14px;display:flex;gap:8px;align-items:center;">
       <button class="btn btn-pr btn-sm" onclick="runClassAnalysis()">🔍 반 분석 실행</button>
+      <span id="classAnalysisHint" style="font-size:11px;color:var(--mu);"></span>
     </div>
   </div>
 
   <div id="anaClassResult" style="display:none;">
+    <!-- 요약 카드 -->
     <div class="srow" id="classStatRow"></div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
+
+    <!-- 담당반 vs 전체 비교 그래프 행 -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;" id="classCompareRow">
       <div class="card card-sm">
-        <div class="ct"><span class="ci">📊</span> 성적 분포 히스토그램</div>
+        <div class="ct"><span class="ci">📈</span> 회차별 정답률 추이 <span style="font-size:10px;color:var(--mu);font-weight:400;">(담당반 vs 전체)</span></div>
+        <div style="position:relative;height:220px;"><canvas id="classTrendChart"></canvas></div>
+      </div>
+      <div class="card card-sm">
+        <div class="ct"><span class="ci">📊</span> 성적 분포 비교 <span style="font-size:10px;color:var(--mu);font-weight:400;">(담당반 vs 전체)</span></div>
         <div style="position:relative;height:220px;"><canvas id="classHistChart"></canvas></div>
       </div>
+    </div>
+
+    <!-- 기존 차트 행 -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
       <div class="card card-sm">
         <div class="ct"><span class="ci">🔔</span> 전국 누적데이터 대비 반 위치</div>
         <div style="position:relative;height:220px;"><canvas id="classNormChart"></canvas></div>
       </div>
+      <div class="card card-sm">
+        <div class="ct"><span class="ci">📋</span> 문항별 반 정답률</div>
+        <div class="ubl" id="classUnitBars" style="max-height:220px;overflow-y:auto;"></div>
+      </div>
     </div>
-    <div class="card card-sm">
-      <div class="ct"><span class="ci">📋</span> 문항별 반 정답률</div>
-      <div class="ubl" id="classUnitBars" style="max-height:400px;overflow-y:auto;"></div>
-    </div>
+
     <div class="card card-sm">
       <div class="ct"><span class="ci">🏆</span> 성적 순위표</div>
-      <div class="tbl-wrap"><table class="tbl"><thead><tr><th style="width:36px">순위</th><th>이름</th><th>학교</th><th>정답수</th><th>정답률</th><th>등급</th><th>가상순위</th></tr></thead><tbody id="classRankBody"></tbody></table></div>
+      <div class="tbl-wrap"><table class="tbl"><thead><tr>
+        <th style="width:36px">순위</th><th>이름</th><th>학교</th>
+        <th>정답수</th><th>정답률</th><th>등급</th><th>가상순위</th>
+      </tr></thead><tbody id="classRankBody"></tbody></table></div>
     </div>
   </div>
+
   <div id="anaClassEmpty" style="text-align:center;padding:50px;color:var(--mu);">
     <div style="font-size:40px;margin-bottom:12px;">📊</div>
-    <div style="font-size:14px;font-weight:700;">학년과 시험지를 선택하고 분석을 실행하세요</div>
+    <div style="font-size:14px;font-weight:700;">선생님·학년·회차를 선택하고 분석을 실행하세요</div>
   </div>
 </div>
 
@@ -971,27 +1008,54 @@ body::before{content:'';position:fixed;inset:0;background:
 <div id="s7" class="sec">
 <div class="card">
 <div class="ct"><span class="ci">📲</span> 학부모 공유 리포트</div>
-<p style="font-size:12px;color:var(--mu);margin-bottom:12px;">학생 선택 → 시험 선택 → 링크 생성 → 복사 후 발송. 학부모는 링크만으로 성적을 확인합니다.</p>
-<div style="max-width:520px;">
-<div>
-<div class="fg" id="shareTeacherWrap" style="display:none;"><label>담당 선생님</label><select id="shareTeacherSel" onchange="renderShareStudents()" style="padding:7px;border-radius:7px;border:1.5px solid var(--bo);font-size:12px;width:100%;"></select></div>
-<div class="fg"><label>학년 필터</label><select id="shareGradeFilter" onchange="renderShareStudents()" style="padding:7px;border-radius:7px;border:1.5px solid var(--bo);font-size:12px;width:100%;"></select></div>
-<div class="fg"><label>학생 선택</label><select id="shareStudentSel" onchange="onShareStudentChange()" style="padding:7px;border-radius:7px;border:1.5px solid var(--bo);font-size:12px;width:100%;"><option value="">-- 학생 선택 --</option></select></div>
-<div id="shareParentInfo" style="display:none;font-size:11px;padding:7px 10px;background:var(--pp);border-radius:7px;margin-bottom:10px;color:var(--pr);font-weight:700;"></div>
-<div class="fg"><label>공유할 시험</label>
-<div id="shareExamControls" style="display:none;gap:6px;margin-bottom:6px;">
-<button class="btn btn-sm" onclick="selectAllShareExams()" style="padding:3px 9px;font-size:11px;">전체선택</button>
-<button class="btn btn-sm" onclick="deselectAllShareExams()" style="padding:3px 9px;font-size:11px;">전체해제</button>
-</div>
-<div id="shareExamList" style="max-height:180px;overflow-y:auto;border:1px solid var(--bd);border-radius:7px;padding:6px;font-size:12px;color:var(--mu);">학생을 먼저 선택하세요</div></div>
-<button class="btn btn-pr" onclick="genShareLink()" style="width:100%;margin-top:4px;">🔗 링크 생성</button>
-<div id="shareResultBox" style="display:none;margin-top:10px;">
-<div style="display:flex;gap:6px;margin-bottom:7px;"><input id="shareLinkInput" type="text" readonly style="flex:1;padding:6px;background:var(--sf);border:1px solid var(--bd);border-radius:7px;font-size:10px;font-family:monospace;"><button class="btn btn-pr btn-sm" onclick="copyShareLink()">복사</button></div>
-<div style="display:flex;gap:6px;"><button class="btn btn-sm" onclick="openSharePreview()" style="flex:1;background:#fee500;color:#000;font-weight:700;">🔍 미리보기</button><button class="btn btn-sm" onclick="sendSMSShare()" style="flex:1;background:var(--ok);color:#fff;">📱 문자</button></div>
-</div>
+<p style="font-size:12px;color:var(--mu);margin-bottom:14px;">학생 카드 클릭 → 시험 선택 → 링크 생성 → 복사 후 발송</p>
+
+<!-- 필터 바 -->
+<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px;">
+  <div id="shareTeacherWrap" style="display:none;flex:1;min-width:110px;">
+    <select id="shareTeacherSel" onchange="renderShareStudents()" style="width:100%;padding:7px;border-radius:7px;border:1.5px solid var(--bo);font-size:12px;"></select>
+  </div>
+  <div style="flex:1;min-width:110px;">
+    <select id="shareGradeFilter" onchange="renderShareStudents()" style="width:100%;padding:7px;border-radius:7px;border:1.5px solid var(--bo);font-size:12px;"></select>
+  </div>
+  <div id="shareStudentCount" style="font-size:11px;color:var(--mu);white-space:nowrap;"></div>
 </div>
 
+<!-- 학생 카드 그리드 -->
+<div id="shareStudentGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;margin-bottom:16px;max-height:480px;overflow-y:auto;padding-right:2px;"></div>
+
+<!-- 선택된 학생 + 시험 선택 패널 -->
+<div id="sharePanel" style="display:none;">
+  <div style="border-top:2px solid var(--bo);padding-top:14px;margin-top:4px;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+      <div id="sharePanelStudentName" style="font-size:14px;font-weight:800;color:var(--dk);flex:1;"></div>
+      <button class="btn btn-sm" onclick="clearShareStudent()" style="font-size:11px;padding:3px 9px;">✕ 취소</button>
+    </div>
+    <div id="shareParentInfo" style="display:none;font-size:11px;padding:7px 10px;background:var(--pp);border-radius:7px;margin-bottom:10px;color:var(--pr);font-weight:700;"></div>
+    <div class="fg"><label>공유할 시험</label>
+      <div id="shareExamControls" style="display:none;gap:6px;margin-bottom:6px;">
+        <button class="btn btn-sm" onclick="selectAllShareExams()" style="padding:3px 9px;font-size:11px;">전체선택</button>
+        <button class="btn btn-sm" onclick="deselectAllShareExams()" style="padding:3px 9px;font-size:11px;">전체해제</button>
+      </div>
+      <div id="shareExamList" style="max-height:180px;overflow-y:auto;border:1px solid var(--bd);border-radius:7px;padding:6px;font-size:12px;color:var(--mu);">학생을 선택하세요</div>
+    </div>
+    <button class="btn btn-pr" onclick="genShareLink()" style="width:100%;margin-top:4px;">🔗 링크 생성</button>
+    <div id="shareResultBox" style="display:none;margin-top:10px;">
+      <div style="display:flex;gap:6px;margin-bottom:7px;">
+        <input id="shareLinkInput" type="text" readonly style="flex:1;padding:6px;background:var(--sf);border:1px solid var(--bd);border-radius:7px;font-size:10px;font-family:monospace;">
+        <button class="btn btn-pr btn-sm" onclick="copyShareLink()">복사</button>
+      </div>
+      <div style="display:flex;gap:6px;">
+        <button class="btn btn-sm" onclick="openSharePreview()" style="flex:1;background:#fee500;color:#000;font-weight:700;">🔍 미리보기</button>
+        <button class="btn btn-sm" onclick="sendSMSShare()" style="flex:1;background:var(--ok);color:#fff;">📱 문자</button>
+      </div>
+    </div>
+  </div>
 </div>
+
+<!-- 기존 shareStudentSel은 genShareLink 등 내부 함수가 참조하므로 숨김 유지 -->
+<select id="shareStudentSel" style="display:none;"></select>
+
 </div>
 </div>
 </div><!-- end .body -->
@@ -1846,6 +1910,57 @@ function pickMainGroupForStudent(studentId, gradeKey){
   return best || groups[0];
 }
 
+
+// === 성적 추이 헬퍼: 최근 2회차 정답률 비교 → {last, prev, diff, arrow} ===
+function getScoreTrend(studentId){
+  var sc = DB.scores[studentId]||{};
+  var keys = Object.keys(sc).filter(function(k){
+    return DB.exams[k] && sc[k] && sc[k].length;
+  });
+  if(typeof sortExamKeysByRound==='function') keys = sortExamKeysByRound(keys);
+  if(keys.length<1) return null;
+  var lk = keys[keys.length-1];
+  var ex = DB.exams[lk];
+  var lastPct = ex ? Math.round(sc[lk].filter(Boolean).length / ex.total * 100) : null;
+  if(lastPct===null) return null;
+  var prevPct = null;
+  if(keys.length>=2){
+    var pk = keys[keys.length-2];
+    var px = DB.exams[pk];
+    if(px) prevPct = Math.round(sc[pk].filter(Boolean).length / px.total * 100);
+  }
+  var diff = (prevPct!==null) ? (lastPct - prevPct) : null;
+  var arrow = '';
+  if(diff!==null){
+    if(diff>0)       arrow='up';
+    else if(diff<0)  arrow='down';
+    else             arrow='same';
+  }
+  return {last:lastPct, prev:prevPct, diff:diff, arrow:arrow};
+}
+// 추이 HTML 뱃지 생성
+function scoreTrendBadge(trend, opts){
+  if(!trend) return '';
+  opts = opts||{};
+  var pctHtml = '<span style="font-weight:800;color:'+(trend.last>=70?'#059669':trend.last>=50?'#d97706':'#dc2626')+';">'+trend.last+'%</span>';
+  if(trend.diff===null) return pctHtml; // 시험 1회차만 있는 경우
+  var icon, color, diffStr;
+  if(trend.arrow==='up'){
+    icon='▲'; color='#10b981'; diffStr='+'+trend.diff;
+  } else if(trend.arrow==='down'){
+    icon='▼'; color='#ef4444'; diffStr=''+trend.diff;
+  } else {
+    icon='━'; color='#94a3b8'; diffStr='±0';
+  }
+  var size = opts.small ? '9px' : '10px';
+  return pctHtml
+    +'<span style="font-size:'+size+';color:'+color+';font-weight:800;white-space:nowrap;" title="이전 '+trend.prev+'% → 최근 '+trend.last+'%">'
+    +icon+diffStr+'%'
+    +'</span>';
+}
+
+
+// === 성적 추이 헬퍼 끝 ===
 
 // 학년 → 학년키 역매핑
 var GRADE_KEY_MAP = {
@@ -2967,100 +3082,90 @@ function renderStatsDashboard(){
   var rowKeys=teachers.slice();
   if(hasNone) rowKeys.push('__none__');
 
-  // ===== 요약 카드 =====
-  var html='<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;">';
-  html+=statCard('총 학생', total+'명', '#1a3a6b');
-  html+=statCard('담당 선생님', teachers.length+'명', '#2557a7');
-  html+=statCard('학년 종류', activeGrades.length+'개', '#7c3aed');
-  if(hasNone) html+=statCard('미지정', (teacherTotals['__none__']||0)+'명', '#94a3b8');
+  // ===== 교차표 (요약 수치 내장) =====
+  var html='<div style="overflow-x:auto;margin-bottom:12px;border:1px solid var(--bd);border-radius:10px;">';
+  // 상단 요약 바
+  html+='<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:linear-gradient(135deg,#1a3a6b,#2557a7);border-radius:10px 10px 0 0;flex-wrap:wrap;">';
+  html+='<span style="color:#fff;font-size:13px;font-weight:900;">👥 '+total+'명</span>';
+  html+='<span style="color:rgba(255,255,255,.7);font-size:11px;">선생님 '+teachers.length+'명</span>';
+  html+='<span style="color:rgba(255,255,255,.7);font-size:11px;">·</span>';
+  html+='<span style="color:rgba(255,255,255,.7);font-size:11px;">학년 '+activeGrades.length+'개</span>';
+  if(hasNone) html+='<span style="background:rgba(255,255,255,.15);color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;margin-left:auto;">미지정 '+(teacherTotals['__none__']||0)+'명</span>';
   html+='</div>';
-
-  // ===== 교차표 =====
-  html+='<div style="overflow-x:auto;margin-bottom:16px;border:1px solid var(--bd);border-radius:10px;">';
-  html+='<table style="width:100%;border-collapse:collapse;font-size:12px;min-width:'+(160+activeGrades.length*54+60)+'px;">';
+  html+='<table style="width:100%;border-collapse:collapse;font-size:12px;min-width:'+(140+activeGrades.length*48+64)+'px;">';
   // 헤더
-  html+='<thead><tr style="background:linear-gradient(135deg,#1a3a6b,#2557a7);color:#fff;">';
-  html+='<th style="padding:10px 12px;text-align:left;position:sticky;left:0;background:#1a3a6b;">선생님 \\ 학년</th>';
+  html+='<thead><tr style="background:#f0f4ff;">';
+  html+='<th style="padding:8px 12px;text-align:left;position:sticky;left:0;background:#f0f4ff;border-bottom:2px solid var(--bd);font-size:11px;color:#475569;">선생님</th>';
   activeGrades.forEach(function(k){
-    html+='<th style="padding:10px 6px;text-align:center;white-space:nowrap;">'+gradeShort[k]+'</th>';
+    html+='<th style="padding:8px 4px;text-align:center;border-bottom:2px solid var(--bd);white-space:nowrap;">'
+      +'<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+gradeColors[k]+';margin-right:2px;vertical-align:middle;"></span>'
+      +'<span style="font-size:10px;color:#475569;">'+gradeShort[k]+'</span>'
+      +'</th>';
   });
-  html+='<th style="padding:10px 10px;text-align:center;background:#15305a;">합계</th>';
+  html+='<th style="padding:8px 10px;text-align:center;border-bottom:2px solid var(--bd);font-size:11px;color:#475569;min-width:64px;">합계</th>';
   html+='</tr></thead><tbody>';
   // 각 선생님 행
+  var maxT=Math.max.apply(null, rowKeys.map(function(t){return teacherTotals[t]||0;}).concat([1]));
   rowKeys.forEach(function(t,ri){
     var label = (t==='__none__') ? '❓ 미지정' : t;
-    var rowBg = ri%2===0 ? 'var(--bg)' : 'var(--sf)';
+    var rowBg = ri%2===0 ? '#fff' : 'var(--sf)';
+    var tv = teacherTotals[t]||0;
+    var barPct = Math.round(tv/maxT*100);
     html+='<tr style="background:'+rowBg+';">';
-    html+='<td style="padding:9px 12px;font-weight:700;border-top:1px solid var(--bd);position:sticky;left:0;background:'+rowBg+';white-space:nowrap;">'+escHtml(label)+'</td>';
+    html+='<td style="padding:7px 12px;font-weight:700;font-size:11px;border-top:1px solid var(--bd);position:sticky;left:0;background:'+rowBg+';white-space:nowrap;">'+escHtml(label)+'</td>';
     activeGrades.forEach(function(k){
       var v=(byTeacher[t]&&byTeacher[t][k])||0;
-      var cellStyle='padding:9px 6px;text-align:center;border-top:1px solid var(--bd);';
-      if(v>0) cellStyle+='font-weight:700;color:'+gradeColors[k]+';';
-      else cellStyle+='color:var(--bd);';
+      var cellStyle='padding:7px 4px;text-align:center;border-top:1px solid var(--bd);font-size:11px;';
+      if(v>0) cellStyle+='font-weight:800;color:'+gradeColors[k]+';';
+      else cellStyle+='color:#e2e8f0;';
       html+='<td style="'+cellStyle+'">'+(v||'·')+'</td>';
     });
-    html+='<td style="padding:9px 10px;text-align:center;font-weight:800;border-top:1px solid var(--bd);background:rgba(37,87,167,0.08);">'+(teacherTotals[t]||0)+'</td>';
+    // 합계 + 미니 바
+    html+='<td style="padding:7px 10px;border-top:1px solid var(--bd);">'
+      +'<div style="display:flex;align-items:center;gap:5px;">'
+      +'<span style="font-weight:800;font-size:12px;color:#1a3a6b;min-width:22px;text-align:right;">'+tv+'</span>'
+      +'<div style="flex:1;height:6px;background:var(--sf);border-radius:3px;overflow:hidden;">'
+      +'<div style="height:100%;width:'+barPct+'%;background:linear-gradient(90deg,#2557a7,#3b82f6);border-radius:3px;"></div>'
+      +'</div></div></td>';
     html+='</tr>';
   });
   // 합계 행
-  html+='<tr style="background:rgba(26,58,107,0.1);font-weight:800;">';
-  html+='<td style="padding:10px 12px;border-top:2px solid var(--pr);position:sticky;left:0;background:#dde6f5;">합계</td>';
-  activeGrades.forEach(function(k){
-    html+='<td style="padding:10px 6px;text-align:center;border-top:2px solid var(--pr);color:'+gradeColors[k]+';">'+(gradeTotals[k]||0)+'</td>';
-  });
-  html+='<td style="padding:10px 10px;text-align:center;border-top:2px solid var(--pr);background:rgba(37,87,167,0.15);">'+total+'</td>';
-  html+='</tr></tbody></table></div>';
-
-  // ===== 막대그래프 2개 (선생님별 / 학년별) =====
-  html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;" class="stats-charts">';
-
-  // 선생님별 막대
-  var maxT=Math.max.apply(null, rowKeys.map(function(t){return teacherTotals[t]||0;}).concat([1]));
-  html+='<div style="border:1px solid var(--bd);border-radius:10px;padding:12px;">';
-  html+='<div style="font-size:12px;font-weight:800;color:var(--dk);margin-bottom:10px;">👨‍🏫 선생님별 인원</div>';
-  rowKeys.forEach(function(t){
-    var label=(t==='__none__')?'미지정':t;
-    var v=teacherTotals[t]||0;
-    var pct=Math.round(v/maxT*100);
-    html+='<div style="margin-bottom:7px;">'
-      +'<div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:2px;"><span style="font-weight:600;">'+escHtml(label)+'</span><span style="color:var(--mu);font-weight:700;">'+v+'명</span></div>'
-      +'<div style="height:9px;background:var(--sf);border-radius:5px;overflow:hidden;"><div style="height:100%;width:'+pct+'%;background:linear-gradient(90deg,#2557a7,#3b82f6);border-radius:5px;"></div></div>'
-      +'</div>';
-  });
-  html+='</div>';
-
-  // 학년별 막대
-  var maxG=Math.max.apply(null, activeGrades.map(function(k){return gradeTotals[k]||0;}).concat([1]));
-  html+='<div style="border:1px solid var(--bd);border-radius:10px;padding:12px;">';
-  html+='<div style="font-size:12px;font-weight:800;color:var(--dk);margin-bottom:10px;">📚 학년별 인원</div>';
+  html+='<tr style="background:#f0f4ff;font-weight:800;">';
+  html+='<td style="padding:8px 12px;border-top:2px solid #2557a7;position:sticky;left:0;background:#e0e8f8;font-size:11px;color:#1a3a6b;">합계</td>';
   activeGrades.forEach(function(k){
     var v=gradeTotals[k]||0;
-    var pct=Math.round(v/maxG*100);
-    html+='<div style="margin-bottom:7px;">'
-      +'<div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:2px;"><span style="font-weight:600;">'+gradeLabels[k]+'</span><span style="color:var(--mu);font-weight:700;">'+v+'명</span></div>'
-      +'<div style="height:9px;background:var(--sf);border-radius:5px;overflow:hidden;"><div style="height:100%;width:'+pct+'%;background:'+gradeColors[k]+';border-radius:5px;"></div></div>'
-      +'</div>';
+    html+='<td style="padding:8px 4px;text-align:center;border-top:2px solid #2557a7;font-size:11px;color:'+gradeColors[k]+';font-weight:800;">'+(v||'·')+'</td>';
   });
-  html+='</div>';
-  html+='</div>';
+  html+='<td style="padding:8px 10px;text-align:center;border-top:2px solid #2557a7;font-size:13px;font-weight:900;color:#1a3a6b;">'+total+'</td>';
+  html+='</tr></tbody></table></div>';
 
-  // ===== 선생님별 회차당 응시현황 =====
-  html+='<div style="margin-top:16px;border:1px solid var(--bd);border-radius:10px;padding:12px;">';
-  html+='<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px;">';
-  html+='<div style="font-size:12px;font-weight:800;color:var(--dk);">🗓️ 선생님별 회차당 응시현황</div>';
-  html+='<div style="display:flex;gap:6px;">'
+  // ===== 선생님별 회차당 응시현황 (접힘 토글) =====
+  html+='<div style="margin-top:12px;border:1px solid var(--bd);border-radius:10px;overflow:hidden;">';
+  html+='<button onclick="toggleAttendanceStats(this)" style="width:100%;display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--sf);border:none;cursor:pointer;font-size:12px;font-weight:800;color:var(--dk);">'
+    +'<span>🗓️ 선생님별 회차당 응시현황</span>'
+    +'<span style="font-size:10px;color:var(--mu);">▼ 펼치기</span>'
+    +'</button>';
+  html+='<div id="attendanceStatsWrap" style="display:none;padding:12px;">';
+  html+='<div style="display:flex;gap:6px;margin-bottom:10px;">'
     +'<select id="attGradeSel" onchange="renderAttendanceStatsSection()" style="font-size:11px;padding:5px 7px;border-radius:6px;border:1.5px solid var(--bo);"></select>'
     +'<select id="attGroupSel" onchange="renderAttendanceStatsSection()" style="font-size:11px;padding:5px 7px;border-radius:6px;border:1.5px solid var(--bo);"></select>'
     +'</div>';
-  html+='</div>';
   html+='<div id="attendanceStatsBox"></div>';
-  html+='</div>';
+  html+='</div></div>';
 
   box.innerHTML=html;
 
-  // 학년/시험그룹 드롭다운 초기화 + 표 렌더 (관리자 전용 섹션이므로 여기서만 호출)
+  // 학년/시험그룹 드롭다운 초기화 (응시현황은 펼칠 때 렌더)
   initAttendanceStatsSelectors();
-  renderAttendanceStatsSection();
+}
+
+function toggleAttendanceStats(btn){
+  var wrap=document.getElementById('attendanceStatsWrap');
+  if(!wrap) return;
+  var open=wrap.style.display!=='none';
+  wrap.style.display=open?'none':'block';
+  btn.querySelector('span:last-child').textContent=open?'▼ 펼치기':'▲ 접기';
+  if(!open) renderAttendanceStatsSection(); // 첫 펼침 시 렌더
 }
 
 // === 일반 선생님용 통계: 본인 반 + 전체 학년별 학생수 ===
@@ -3371,13 +3476,8 @@ function renderStudents(){
   // 학생 카드 HTML 생성 헬퍼
   function studentCardHtml(s){
     var scoreCount = Object.keys(DB.scores[s.id]||{}).length;
-    var lastPct = '';
-    var scoreKeys = Object.keys(DB.scores[s.id]||{});
-    if(scoreKeys.length>0){
-      var lk = scoreKeys[scoreKeys.length-1];
-      var arr = DB.scores[s.id][lk];
-      lastPct = Math.round(arr.filter(Boolean).length/arr.length*100)+'%';
-    }
+    var trend = getScoreTrend(s.id);
+    var trendHtml = trend ? scoreTrendBadge(trend) : '';
     var phoneTag = s.parentPhone ? '<span style="font-size:10px;color:var(--ok);" title="리포트 암호: '+s.parentPhone.slice(-4)+'">🔒'+s.parentPhone.slice(-4)+'</span>' : '';
     // 응시현황 dot (학생의 학년에서 응시 기록이 가장 많은 시험그룹 1개를 대표로 표시)
     var attendDots = '';
@@ -3399,7 +3499,7 @@ function renderStudents(){
       +'<div style="display:flex;align-items:center;gap:6px;margin-top:10px;flex-wrap:wrap;">'
       +'<span style="font-size:11px;color:var(--mu);">시험 '+scoreCount+'회</span>'
       +phoneTag
-      +(lastPct?'<span class="badge b-pr">최근 '+lastPct+'</span>':'')
+      +(trendHtml?'<span class="badge b-pr" style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;">최근 '+trendHtml+'</span>':'')
       +'<div style="margin-left:auto;display:flex;gap:4px;">'
       +'<button class="btn btn-mu btn-xs std-edit-btn" data-sid="'+s.id+'" onclick="event.stopPropagation();">✏️ 수정</button>'
       +'<button class="btn btn-ng btn-xs std-del-btn" data-sid="'+s.id+'" onclick="event.stopPropagation();">🗑️</button>'
@@ -5304,10 +5404,6 @@ function runPersonalAnalysis(){
   // 정답률이 낮은 소단원의 오답만 집중 표시
   document.getElementById('anaWrongList').innerHTML = buildFocusedWrongList(examKeys, allScores, unitMap);
 
-  // 약점TIPS
-  var _wr=[];
-  examKeys.forEach(function(k){var ex=DB.exams[k],ans=allScores[k];ex.questions.forEach(function(q,i){if(!ans[i])_wr.push({question:q});});});
-  document.getElementById('anaTypeTips').innerHTML=buildTypeTipsHTML(_wr);
   // 레이더 (중단원 기준)
   var _uK=Object.keys(majorMap).slice(0,8);
   buildRadarChart('anaRadarUnit',_uK,_uK.map(function(u){var m=majorMap[u];return m.tot?Math.round(m.ok/m.tot*100):0;}),'단원','rgba(37,87,167,0.2)');
@@ -5375,57 +5471,169 @@ function renderNormChart(pct, lv){
 // =============================================
 // === S5: 반 분석 ===
 // =============================================
+// ============================================================
+// === S5: 반 분석 ===
+// ============================================================
+var _classSelectedExams = {}; // {examKey: true}
+
 function initClassTab(){
+  // 선생님 드롭다운 (관리자만)
+  var myName = getMyTeacherName();
+  var tw = document.getElementById('classTeacherWrap');
+  var ts = document.getElementById('classTeacher');
+  if(tw && ts){
+    if(myName){
+      tw.style.display = 'none';
+    } else {
+      tw.style.display = '';
+      ts.innerHTML = '<option value="">선생님 선택</option>';
+      var teachers = (DB.teachers||[]).slice().sort(function(a,b){return a.localeCompare(b,'ko');});
+      var fromStudents = {};
+      DB.students.forEach(function(s){ if(s.teacher) fromStudents[s.teacher]=true; });
+      Object.keys(fromStudents).forEach(function(t){ if(teachers.indexOf(t)<0) teachers.push(t); });
+      teachers.sort(function(a,b){return a.localeCompare(b,'ko');});
+      teachers.forEach(function(t){ ts.innerHTML += '<option value="'+escHtml(t)+'">'+escHtml(t)+'</option>'; });
+    }
+  }
+  // 학년 드롭다운
   var cg = document.getElementById('classGrade');
   cg.innerHTML = '<option value="">학년 선택</option>';
   GRADE_LIST.forEach(function(g){
     cg.innerHTML += '<option value="'+g.key+'">'+g.label+'</option>';
   });
-  document.getElementById('classExam').innerHTML = '<option value="">시험지 선택</option>';
+  document.getElementById('classGroup').innerHTML = '<option value="">시험 구분 선택</option>';
+  document.getElementById('classExamList').innerHTML = '';
+  document.getElementById('classExamWrap').style.display = 'none';
   document.getElementById('anaClassResult').style.display = 'none';
   document.getElementById('anaClassEmpty').style.display  = 'block';
+  _classSelectedExams = {};
+}
+
+function onClassTeacherChange(){
+  // 선생님 변경 → 학년 리셋
+  var cg = document.getElementById('classGrade');
+  cg.value = '';
+  onClassGradeChange();
 }
 
 function onClassGradeChange(){
-  var gk  = document.getElementById('classGrade').value;
-  var sel = document.getElementById('classExam');
-  sel.innerHTML = '<option value="">시험지 선택</option>';
+  var gk = document.getElementById('classGrade').value;
+  var grpSel = document.getElementById('classGroup');
+  grpSel.innerHTML = '<option value="">시험 구분 선택</option>';
+  document.getElementById('classExamList').innerHTML = '';
+  document.getElementById('classExamWrap').style.display = 'none';
   document.getElementById('anaClassResult').style.display = 'none';
-  document.getElementById('anaClassEmpty').style.display  = 'block';
+  document.getElementById('anaClassEmpty').style.display = 'block';
+  _classSelectedExams = {};
   if(!gk) return;
   var g = GRADE_LIST.find(function(x){return x.key===gk;});
   if(!g) return;
+  // 실제 시험 데이터가 있는 그룹만
   g.groups.forEach(function(grp){
-    grp.exams.forEach(function(e){
-      if(DB.exams[e.key]){
-        sel.innerHTML += '<option value="'+e.key+'">'+escHtml(grp.glabel+' '+e.label)+'</option>';
-      }
-    });
+    var hasExam = grp.exams.some(function(e){ return DB.exams[e.key]; });
+    if(hasExam) grpSel.innerHTML += '<option value="'+escHtml(grp.gkey)+'">'+escHtml(grp.glabel)+'</option>';
   });
 }
 
-function runClassAnalysis(){
+function onClassGroupChange(){
   var gk = document.getElementById('classGrade').value;
-  var ek = document.getElementById('classExam').value;
-  if(!gk||!ek){
+  var grpKey = document.getElementById('classGroup').value;
+  var listEl = document.getElementById('classExamList');
+  var wrap = document.getElementById('classExamWrap');
+  listEl.innerHTML = '';
+  _classSelectedExams = {};
+  if(!gk || !grpKey){ wrap.style.display='none'; return; }
+  var g = GRADE_LIST.find(function(x){return x.key===gk;});
+  if(!g){ wrap.style.display='none'; return; }
+  var grp = g.groups.find(function(x){return x.gkey===grpKey;});
+  if(!grp){ wrap.style.display='none'; return; }
+  var exams = grp.exams.filter(function(e){ return DB.exams[e.key]; });
+  if(!exams.length){ wrap.style.display='none'; return; }
+  exams.forEach(function(e){
+    _classSelectedExams[e.key] = true;
+    var lbl = document.createElement('label');
+    lbl.style.cssText = 'display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border:1.5px solid var(--pr);border-radius:20px;cursor:pointer;font-size:11px;font-weight:700;color:var(--pr);background:var(--pp);transition:all .15s;';
+    lbl.innerHTML = '<input type="checkbox" class="class-exam-chk" value="'+e.key+'" checked style="width:14px;height:14px;cursor:pointer;accent-color:var(--pr);">'+escHtml(e.label);
+    lbl.querySelector('input').addEventListener('change', function(){ classUpdateExamSel(); });
+    listEl.appendChild(lbl);
+  });
+  wrap.style.display = 'block';
+  classUpdateExamSel();
+}
+
+function classUpdateExamSel(){
+  _classSelectedExams = {};
+  document.querySelectorAll('.class-exam-chk').forEach(function(cb){
+    var lbl = cb.closest('label');
+    if(cb.checked){
+      _classSelectedExams[cb.value] = true;
+      if(lbl){ lbl.style.borderColor='var(--pr)'; lbl.style.background='var(--pp)'; lbl.style.color='var(--pr)'; }
+    } else {
+      if(lbl){ lbl.style.borderColor='var(--bd)'; lbl.style.background='var(--sf)'; lbl.style.color='var(--mu)'; }
+    }
+  });
+  var sel = Object.keys(_classSelectedExams).length;
+  var total = document.querySelectorAll('.class-exam-chk').length;
+  var cnt = document.getElementById('classExamSelCount');
+  if(cnt) cnt.textContent = sel+'/'+total+'회차 선택';
+}
+
+function classSelectAllExams(){
+  document.querySelectorAll('.class-exam-chk').forEach(function(cb){ cb.checked=true; });
+  classUpdateExamSel();
+}
+function classDeselectAllExams(){
+  document.querySelectorAll('.class-exam-chk').forEach(function(cb){ cb.checked=false; });
+  classUpdateExamSel();
+}
+
+function runClassAnalysis(){
+  var myName = getMyTeacherName();
+  var teacher = myName || (document.getElementById('classTeacher')||{}).value || '';
+  var gk = document.getElementById('classGrade').value;
+  var selKeys = Object.keys(_classSelectedExams);
+
+  if(!gk || !selKeys.length){
     document.getElementById('anaClassResult').style.display='none';
     document.getElementById('anaClassEmpty').style.display='block';
+    document.getElementById('anaClassEmpty').innerHTML =
+      '<div style="font-size:40px;margin-bottom:12px;">📊</div>'
+      +'<div style="font-size:14px;font-weight:700;">학년과 회차를 선택하고 분석을 실행하세요</div>';
     return;
   }
-  var ex = DB.exams[ek];
-  if(!ex){ toast('시험 데이터가 없습니다','ng'); return; }
 
-  // 해당 학년 학생 중 해당 시험 성적 있는 학생만
-  var students = DB.students.filter(function(s){
-    return GRADE_KEY_MAP[s.grade]===gk && DB.scores[s.id] && DB.scores[s.id][ek];
+  // 유효한 시험키만
+  selKeys = selKeys.filter(function(k){ return DB.exams[k]; });
+  if(!selKeys.length){ toast('선택된 시험 데이터가 없습니다','ng'); return; }
+  // 회차 순 정렬
+  if(typeof sortExamKeysByRound==='function') selKeys = sortExamKeysByRound(selKeys);
+
+  // ── 담당반 학생 (선생님 + 학년 일치)
+  var classStudents = DB.students.filter(function(s){
+    var gradeMatch = GRADE_KEY_MAP[s.grade]===gk;
+    var teacherMatch = !teacher || s.teacher===teacher;
+    return gradeMatch && teacherMatch;
   });
 
-  if(students.length===0){
+  // ── 전체 학생 (학년만 일치, 비교용)
+  var allStudents = DB.students.filter(function(s){
+    return GRADE_KEY_MAP[s.grade]===gk;
+  });
+
+  // 마지막 선택 회차 기준으로 성적 있는 학생으로 순위표 구성
+  var lastKey = selKeys[selKeys.length-1];
+  var lastEx  = DB.exams[lastKey];
+
+  var classScoredStudents = classStudents.filter(function(s){
+    return DB.scores[s.id] && DB.scores[s.id][lastKey];
+  });
+
+  if(classScoredStudents.length===0){
     document.getElementById('anaClassResult').style.display='none';
-    document.getElementById('anaClassEmpty').innerHTML=
+    document.getElementById('anaClassEmpty').innerHTML =
       '<div style="font-size:40px;margin-bottom:12px;">📭</div>'
-      +'<div style="font-size:14px;font-weight:700;">해당 학년·시험에 성적 데이터가 없습니다</div>'
-      +'<div style="font-size:12px;margin-top:6px;color:var(--mu);">③ 성적 입력 탭에서 학생 성적을 입력해주세요</div>';
+      +'<div style="font-size:14px;font-weight:700;">해당 조건에 성적 데이터가 없습니다</div>'
+      +'<div style="font-size:12px;margin-top:6px;color:var(--mu);">성적 입력 탭에서 성적을 입력해주세요</div>';
     document.getElementById('anaClassEmpty').style.display='block';
     return;
   }
@@ -5433,66 +5641,129 @@ function runClassAnalysis(){
   document.getElementById('anaClassResult').style.display='block';
   document.getElementById('anaClassEmpty').style.display='none';
 
-  // 학생별 점수 계산
-  var scoreList = students.map(function(s){
-    var ans = DB.scores[s.id][ek];
+  // ── 마지막 회차 기준 점수 계산
+  var scoreList = classScoredStudents.map(function(s){
+    var ans = DB.scores[s.id][lastKey];
     var ok  = ans.filter(Boolean).length;
-    return {s:s, ok:ok, pct:Math.round(ok/ex.total*100)};
+    return {s:s, ok:ok, pct:Math.round(ok/lastEx.total*100)};
   }).sort(function(a,b){return b.ok-a.ok;});
 
-  var avg = Math.round(scoreList.reduce(function(a,x){return a+x.pct;},0)/scoreList.length);
-  var maxP= scoreList[0].pct;
-  var minP= scoreList[scoreList.length-1].pct;
+  var avg    = Math.round(scoreList.reduce(function(a,x){return a+x.pct;},0)/scoreList.length);
+  var maxP   = scoreList[0].pct;
+  var minP   = scoreList[scoreList.length-1].pct;
 
-  // 요약 카드
+  // ── 전체반 평균 (비교용, 마지막 회차)
+  var allScoredLast = allStudents.filter(function(s){
+    return DB.scores[s.id] && DB.scores[s.id][lastKey];
+  });
+  var allAvgLast = allScoredLast.length
+    ? Math.round(allScoredLast.reduce(function(acc,s){
+        var a=DB.scores[s.id][lastKey]; return acc+Math.round(a.filter(Boolean).length/lastEx.total*100);
+      },0)/allScoredLast.length)
+    : null;
+
+  // ── 요약 카드
+  var hint = teacher ? '('+escHtml(teacher)+' 선생님 반)' : '('+gk+' 전체)';
   document.getElementById('classStatRow').innerHTML=
-    '<div class="sc"><div class="scl">응시 학생</div><div class="scv">'+students.length+'<span style="font-size:13px">명</span></div></div>'
-   +'<div class="sc '+(avg>=70?'gd':avg>=50?'wn':'bd')+'"><div class="scl">반 평균</div><div class="scv">'+avg+'<span style="font-size:14px">%</span></div></div>'
-   +'<div class="sc gd"><div class="scl">최고 정답률</div><div class="scv">'+maxP+'<span style="font-size:14px">%</span></div></div>'
-   +'<div class="sc bd"><div class="scl">최저 정답률</div><div class="scv">'+minP+'<span style="font-size:14px">%</span></div></div>';
+    '<div class="sc"><div class="scl">분석 대상 '+hint+'</div><div class="scv">'+scoreList.length+'<span style="font-size:13px">명</span></div></div>'
+   +'<div class="sc '+(avg>=70?'gd':avg>=50?'wn':'bd')+'"><div class="scl">담당반 평균</div><div class="scv">'+avg+'<span style="font-size:14px">%</span></div></div>'
+   +(allAvgLast!==null?'<div class="sc"><div class="scl">전체 평균</div><div class="scv">'+allAvgLast+'<span style="font-size:14px">%</span></div></div>':'')
+   +'<div class="sc gd"><div class="scl">최고</div><div class="scv">'+maxP+'<span style="font-size:14px">%</span></div></div>'
+   +'<div class="sc bd"><div class="scl">최저</div><div class="scv">'+minP+'<span style="font-size:14px">%</span></div></div>';
 
-  // 히스토그램
-  var bins=[0,0,0,0,0]; // 0~39, 40~59, 60~79, 80~89, 90~100
-  scoreList.forEach(function(r){
-    if(r.pct>=90)bins[4]++;
-    else if(r.pct>=80)bins[3]++;
-    else if(r.pct>=60)bins[2]++;
-    else if(r.pct>=40)bins[1]++;
-    else bins[0]++;
-  });
-  destroyChart('classHistChart');
-  var hc=document.getElementById('classHistChart').getContext('2d');
-  chartInstances['classHistChart']=new Chart(hc,{
-    type:'bar',
-    data:{labels:['~39%','40~59%','60~79%','80~89%','90~100%'],
-      datasets:[{label:'학생 수',data:bins,
-        backgroundColor:['rgba(244,63,94,.7)','rgba(249,115,22,.7)','rgba(245,158,11,.7)','rgba(59,130,246,.7)','rgba(16,185,129,.7)'],
-        borderRadius:6}]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
-      scales:{y:{ticks:{stepSize:1}}}}
+  // ── 회차별 추이 비교 차트 (담당반 vs 전체)
+  var trendLabels=[], trendClass=[], trendAll=[];
+  selKeys.forEach(function(k){
+    var ex=DB.exams[k]; if(!ex) return;
+    var lbl=EXAM_LABEL[k]||k;
+    // 담당반
+    var cs=classStudents.filter(function(s){return DB.scores[s.id]&&DB.scores[s.id][k];});
+    var ca=cs.length?Math.round(cs.reduce(function(acc,s){var a=DB.scores[s.id][k];return acc+Math.round(a.filter(Boolean).length/ex.total*100);},0)/cs.length):null;
+    // 전체
+    var as2=allStudents.filter(function(s){return DB.scores[s.id]&&DB.scores[s.id][k];});
+    var aa=as2.length?Math.round(as2.reduce(function(acc,s){var a=DB.scores[s.id][k];return acc+Math.round(a.filter(Boolean).length/ex.total*100);},0)/as2.length):null;
+    trendLabels.push(lbl);
+    trendClass.push(ca);
+    trendAll.push(aa);
   });
 
-  // 정규분포 (반 위치)
+  // 비교 행 표시/숨김
+  var showCompare = selKeys.length>=1;
+  document.getElementById('classCompareRow').style.display = showCompare?'':'none';
+
+  if(showCompare){
+    destroyChart('classTrendChart');
+    var datasets=[
+      {label:'담당반 평균',data:trendClass,borderColor:'#2557a7',backgroundColor:'rgba(37,87,167,0.1)',pointBackgroundColor:'#2557a7',pointRadius:5,borderWidth:2.5,tension:.3,fill:true},
+      {label:'전체 평균',data:trendAll,borderColor:'#f59e0b',backgroundColor:'rgba(245,158,11,0.07)',pointBackgroundColor:'#f59e0b',pointRadius:5,borderWidth:2,borderDash:[5,4],tension:.3,fill:false}
+    ];
+    chartInstances['classTrendChart']=new Chart(
+      document.getElementById('classTrendChart').getContext('2d'),{
+        type:'line',
+        data:{labels:trendLabels,datasets:datasets},
+        options:{responsive:true,maintainAspectRatio:false,
+          plugins:{legend:{position:'bottom',labels:{font:{size:10},boxWidth:16}}},
+          scales:{y:{min:0,max:100,ticks:{callback:function(v){return v+'%';},font:{size:10}},grid:{color:'rgba(0,0,0,.05)'}},
+                  x:{ticks:{font:{size:10}}}}}
+      });
+
+    // ── 성적 분포 비교 (담당반 vs 전체, 마지막 회차)
+    var bins5=function(students, k, ex){
+      var b=[0,0,0,0,0];
+      students.filter(function(s){return DB.scores[s.id]&&DB.scores[s.id][k];}).forEach(function(s){
+        var p=Math.round(DB.scores[s.id][k].filter(Boolean).length/ex.total*100);
+        if(p>=90)b[4]++;else if(p>=80)b[3]++;else if(p>=60)b[2]++;else if(p>=40)b[1]++;else b[0]++;
+      });
+      return b;
+    };
+    var classBins = bins5(classStudents, lastKey, lastEx);
+    var allBins   = bins5(allStudents,   lastKey, lastEx);
+    destroyChart('classHistChart');
+    chartInstances['classHistChart']=new Chart(
+      document.getElementById('classHistChart').getContext('2d'),{
+        type:'bar',
+        data:{
+          labels:['~39%','40~59%','60~79%','80~89%','90~100%'],
+          datasets:[
+            {label:'담당반',data:classBins,backgroundColor:'rgba(37,87,167,.75)',borderRadius:5},
+            {label:'전체',  data:allBins,  backgroundColor:'rgba(245,158,11,.55)',borderRadius:5}
+          ]},
+        options:{responsive:true,maintainAspectRatio:false,
+          plugins:{legend:{position:'bottom',labels:{font:{size:10},boxWidth:14}}},
+          scales:{y:{ticks:{stepSize:1,font:{size:10}},beginAtZero:true},x:{ticks:{font:{size:10}}}}}
+      });
+  }
+
+  // ── 정규분포 (반 위치)
   destroyChart('classNormChart');
-  var mu2=60,sigma2=18;
-  var xA=[],yA=[];
-  for(var x=0;x<=100;x+=2){xA.push(x);yA.push(parseFloat((students.length*(1/(sigma2*Math.sqrt(2*Math.PI)))*Math.exp(-0.5*Math.pow((x-mu2)/sigma2,2))*2).toFixed(2)));}
-  var nc2=document.getElementById('classNormChart').getContext('2d');
-  chartInstances['classNormChart']=new Chart(nc2,{
-    type:'line',
-    data:{labels:xA,datasets:[
-      {label:'누적데이터 분포',data:yA,borderColor:'rgba(124,58,237,.4)',backgroundColor:'rgba(124,58,237,.06)',fill:true,tension:.4,pointRadius:0},
-      {label:'반 평균',data:xA.map(function(x){return x===Math.round(avg/2)*2?yA[Math.round(avg/2)]||0:null;}),
-        borderColor:'#f59e0b',backgroundColor:'#f59e0b',pointRadius:7,showLine:false}
-    ]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}},scales:{x:{title:{display:true,text:'정답률(%)'}},y:{display:false}}}
-  });
+  var mu2=60,sigma2=18, xA=[],yA=[];
+  for(var x=0;x<=100;x+=2){
+    xA.push(x);
+    yA.push(parseFloat((scoreList.length*(1/(sigma2*Math.sqrt(2*Math.PI)))*Math.exp(-0.5*Math.pow((x-mu2)/sigma2,2))*2).toFixed(2)));
+  }
+  var normDS=[
+    {label:'누적데이터 분포',data:yA,borderColor:'rgba(124,58,237,.4)',backgroundColor:'rgba(124,58,237,.06)',fill:true,tension:.4,pointRadius:0},
+    {label:'담당반 평균('+avg+'%)',data:xA.map(function(xv){return xv===Math.round(avg/2)*2?yA[Math.round(avg/2)]||0:null;}),
+      borderColor:'#2557a7',backgroundColor:'#2557a7',pointRadius:7,showLine:false}
+  ];
+  if(allAvgLast!==null){
+    normDS.push({label:'전체 평균('+allAvgLast+'%)',data:xA.map(function(xv){return xv===Math.round(allAvgLast/2)*2?yA[Math.round(allAvgLast/2)]||0:null;}),
+      borderColor:'#f59e0b',backgroundColor:'#f59e0b',pointRadius:7,showLine:false});
+  }
+  chartInstances['classNormChart']=new Chart(
+    document.getElementById('classNormChart').getContext('2d'),{
+      type:'line',
+      data:{labels:xA,datasets:normDS},
+      options:{responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{position:'bottom',labels:{font:{size:10},boxWidth:14}}},
+        scales:{x:{title:{display:true,text:'정답률(%)'},ticks:{font:{size:9}}},y:{display:false}}}
+    });
 
-  // 문항별 반 정답률 바
+  // ── 문항별 반 정답률 (마지막 회차)
   var qBars='';
-  for(var qi=0;qi<ex.total;qi++){
-    var q=ex.questions[qi]||{};
-    var okCnt=scoreList.filter(function(r){return DB.scores[r.s.id][ek][qi];}).length;
+  for(var qi=0;qi<lastEx.total;qi++){
+    var q=lastEx.questions[qi]||{};
+    var okCnt=scoreList.filter(function(r){return DB.scores[r.s.id][lastKey][qi];}).length;
     var qPct=Math.round(okCnt/scoreList.length*100);
     var barCls=qPct>=70?'ok':qPct>=50?'':'ng';
     qBars+='<div class="ubr">'
@@ -5503,16 +5774,16 @@ function runClassAnalysis(){
   }
   document.getElementById('classUnitBars').innerHTML=qBars;
 
-  // 순위표
+  // ── 순위표 (마지막 회차)
   var rankHtml='';
   scoreList.forEach(function(r,i){
     var lv2=getLvInfo(r.pct);
     var vRank=Math.max(1,Math.min(300,Math.round((1-normCDF(r.pct,60,18))*300)));
-    rankHtml+='<tr><td style="font-weight:800;color:'+(i<3?'var(--ac)':'var(--mu)')+'">'+
-      (i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1)+'위')+'</td>'
+    rankHtml+='<tr><td style="font-weight:800;color:'+(i<3?'var(--ac)':'var(--mu)')+'">'
+      +(i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1)+'위')+'</td>'
       +'<td style="font-weight:700;">'+escHtml(r.s.name)+'</td>'
       +'<td style="color:var(--mu);font-size:11px;">'+escHtml(r.s.school||'—')+'</td>'
-      +'<td style="font-weight:800;color:var(--pr);">'+r.ok+'/'+ex.total+'</td>'
+      +'<td style="font-weight:800;color:var(--pr);">'+r.ok+'/'+lastEx.total+'</td>'
       +'<td><span class="badge '+(r.pct>=70?'b-ok':r.pct>=50?'b-md':'b-ng')+'">'+r.pct+'%</span></td>'
       +'<td><span style="font-size:12px;">'+lv2.title+'</span></td>'
       +'<td style="color:var(--mu);font-size:11px;">누적데이터 대비 '+vRank+'위</td></tr>';
@@ -5773,7 +6044,7 @@ function printPersonalInNewWindow(sid, examKeys, chartImages, returnHtmlOnly){
   var pct = totalQ>0?Math.round(totalRight/totalQ*100):0;
   var lv  = getLvInfo(pct);
 
-  // 단원별 집계
+  // 단원별 집계 (소단원 기준 — 화면의 anaTbody와 동일)
   var unitMap={};
   keys.forEach(function(k){
     var ex=DB.exams[k], ans=allScores[k];
@@ -5799,40 +6070,111 @@ function printPersonalInNewWindow(sid, examKeys, chartImages, returnHtmlOnly){
   });
 
   // 오답 수집 (약점공략 TIPS용)
-  var printWrongs=[];
-  keys.forEach(function(k){
-    var ex=DB.exams[k], ans=allScores[k];
-    (ex.questions||[]).forEach(function(q,i){ if(!ans[i]) printWrongs.push({question:q}); });
-  });
+  // typeMap은 학부모 리포트 차트용으로만 유지
 
-  // 단원별 테이블 HTML
+  // 소단원별 분석 — 정답률 낮은 순 정렬, 상위 7개 카드형 표시
+  var unitEntries = Object.keys(unitMap).map(function(u){
+    var m=unitMap[u];
+    var p=Math.round(m.ok/m.tot*100);
+    // 유형 분포
+    var typeDisp={};
+    keys.forEach(function(k){
+      var ex=DB.exams[k],ans=allScores[k];
+      (ex.questions||[]).forEach(function(q,i){
+        if((q.unit||q.major||'기타')===u){var t=q.type||'?';typeDisp[t]=(typeDisp[t]||0)+1;}
+      });
+    });
+    // 회차별 결과
+    var hist=keys.map(function(k){
+      var ex=DB.exams[k],ans=allScores[k],uOk=0,uTot=0;
+      (ex.questions||[]).forEach(function(q,i){
+        if((q.unit||q.major||'기타')===u){uTot++;if(ans[i])uOk++;}
+      });
+      return{label:EXAM_LABEL[k]||k,ok:uOk,tot:uTot};
+    }).filter(function(r){return r.tot>0;});
+    return{unit:u,pct:p,ok:m.ok,tot:m.tot,typeDisp:typeDisp,hist:hist};
+  });
+  // 정답률 낮은 순 정렬, 상위 7개
+  unitEntries.sort(function(a,b){return a.pct-b.pct;});
+  var topWeak=unitEntries.slice(0,7);
+  var restCount=unitEntries.length-topWeak.length;
+
   var tbodyHtml='';
-  Object.keys(unitMap).forEach(function(u){
-    var m=unitMap[u];
-    var p=Math.round(m.ok/m.tot*100);
-    var bar='<div style="width:'+p+'%;height:8px;background:'+(p>=70?'#10b981':p>=50?'#f59e0b':'#f43f5e')+';border-radius:4px;"></div>';
-    tbodyHtml+='<tr>'
-      +'<td style="font-weight:700;">'+escHtml(u)+'</td>'
-      +'<td style="text-align:center;font-weight:800;color:'+(p>=70?'#059669':p>=50?'#d97706':'#dc2626')+';">'+p+'%</td>'
-      +'<td style="text-align:center;">'+m.ok+'/'+m.tot+'</td>'
-      +'<td><div style="background:#e2e8f0;border-radius:4px;overflow:hidden;">'+bar+'</div></td>'
-      +'</tr>';
-  });
+  topWeak.forEach(function(e,idx){
+    var p=e.pct;
+    var bg=p>=70?'#f0fdf4':p>=50?'#fffbeb':'#fff5f5';
+    var borderC=p>=70?'#10b981':p>=50?'#f59e0b':'#f43f5e';
+    var pctC=p>=70?'#059669':p>=50?'#d97706':'#dc2626';
+    var grade=p>=70?'양호':p>=50?'보통':'취약';
+    var gradeBadge=p>=70?'background:#dcfce7;color:#16a34a':'background:#fef9c3;color:#b45309';
+    if(p<50) gradeBadge='background:#fee2e2;color:#dc2626';
 
-  // 취약 단원 오답 분석
-  var weakHtml='';
-  Object.keys(unitMap).filter(function(u){
-    return Math.round(unitMap[u].ok/unitMap[u].tot*100)<60 && unitMap[u].tot>=2;
-  }).slice(0,5).forEach(function(u){
-    var m=unitMap[u];
-    var p=Math.round(m.ok/m.tot*100);
-    weakHtml+='<div style="background:#fef2f2;border-left:4px solid #f43f5e;border-radius:8px;padding:12px;margin-bottom:10px;">'
-      +'<div style="font-weight:800;color:#dc2626;margin-bottom:6px;">📌 '+escHtml(u)+' — 정답률 '+p+'%</div>'
-      +(m.qs.slice(0,3).map(function(q){
-        return '<div style="font-size:11px;color:#374151;margin-top:4px;">• '+escHtml(q.comment||q.major||'')+'</div>';
-      }).join(''))
+    // 회차별 dot
+    var dotHtml='<div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;">';
+    e.hist.forEach(function(r){
+      var dotC=r.ok===r.tot?'#10b981':r.ok===0?'#f43f5e':'#f59e0b';
+      var dotLabel=escHtml(r.label)+': '+r.ok+'/'+r.tot;
+      dotHtml+='<span title="'+dotLabel+'" style="display:inline-flex;align-items:center;justify-content:center;'
+        +'width:26px;height:26px;border-radius:50%;font-size:10px;font-weight:800;color:#fff;'
+        +'background:'+dotC+';flex-shrink:0;">'+r.ok+'</span>';
+    });
+    dotHtml+='</div>';
+
+    // 유형 분포 태그
+    var typeTags=Object.keys(e.typeDisp).map(function(t){
+      return '<span style="display:inline-block;padding:1px 7px;border-radius:20px;font-size:9px;font-weight:700;'
+        +'background:#ede9fe;color:#7c3aed;margin-right:3px;">'+escHtml(t)+'('+e.typeDisp[t]+')</span>';
+    }).join('');
+
+    tbodyHtml+=
+      '<div style="border:1.5px solid '+borderC+';border-radius:10px;background:'+bg+';padding:12px 14px;margin-bottom:8px;">'
+      // 1행: 순위 + 소단원명 + 등급 뱃지
+      +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">'
+      +'<span style="width:22px;height:22px;border-radius:50%;background:'+borderC+';color:#fff;'
+        +'font-size:10px;font-weight:900;display:flex;align-items:center;justify-content:center;flex-shrink:0;">'+(idx+1)+'</span>'
+      +'<span style="font-size:13px;font-weight:800;color:#1e293b;flex:1;">'+escHtml(e.unit)+'</span>'
+      +'<span style="padding:2px 10px;border-radius:20px;font-size:10px;font-weight:800;'+gradeBadge+';flex-shrink:0;">'+grade+'</span>'
+      +'</div>'
+      // 2행: 정답률(크게) + 달성도 바 + 정오답
+      +'<div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">'
+      +'<div style="font-size:26px;font-weight:900;color:'+pctC+';min-width:54px;">'+p+'<span style="font-size:13px;">%</span></div>'
+      +'<div style="flex:1;">'
+      +'<div style="height:10px;background:#e2e8f0;border-radius:6px;overflow:hidden;">'
+      +'<div style="width:'+p+'%;height:100%;background:'+borderC+';border-radius:6px;transition:width .6s;"></div>'
+      +'</div>'
+      +'<div style="font-size:10px;color:#64748b;margin-top:3px;">정답 '+e.ok+'문항 / 전체 '+e.tot+'문항</div>'
+      +'</div>'
+      +'</div>'
+      // 3행: 회차별 결과 dot
+      +(e.hist.length>0?
+        '<div style="margin-bottom:7px;">'
+        +'<div style="font-size:9px;font-weight:700;color:#64748b;margin-bottom:4px;">회차별 정답수</div>'
+        +dotHtml
+        +'</div>':'')
+      // 4행: 유형 분포
+      +(typeTags?
+        '<div><div style="font-size:9px;font-weight:700;color:#64748b;margin-bottom:3px;">유형 분포</div>'+typeTags+'</div>':'')
       +'</div>';
   });
+
+  // 나머지 소단원 요약 (7개 초과분)
+  if(restCount>0){
+    var restHtml='<div style="border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;background:#f8fafc;'
+      +'display:flex;align-items:center;gap:8px;font-size:11px;color:#64748b;">'
+      +'<span>📋</span><span>나머지 '+restCount+'개 소단원 — ';
+    restHtml+=unitEntries.slice(7).map(function(e){
+      var c=e.pct>=70?'#059669':e.pct>=50?'#d97706':'#dc2626';
+      return '<span style="color:'+c+';font-weight:700;">'+escHtml(e.unit)+'('+e.pct+'%)</span>';
+    }).join(' · ');
+    restHtml+='</span></div>';
+    tbodyHtml+=restHtml;
+  }
+
+  // 소단원별 오답 집중 분석 — 화면과 동일한 buildFocusedWrongList() 재사용 (코멘트DB 진단/개선방향/권고사항 포함)
+  var weakHtml = (typeof buildFocusedWrongList==='function') ? buildFocusedWrongList(keys, allScores, unitMap) : '';
+  // buildFocusedWrongList는 "분석할 데이터가 없습니다" 같은 안내문도 반환하므로, 오답이 전혀 없는 경우는 섹션 자체를 생략
+  if(weakHtml && weakHtml.indexOf('분석할 데이터가 없습니다')>-1) weakHtml='';
+
 
   // 회차별 성적 바
   var trendHtml = trendRows.map(function(r){
@@ -5850,6 +6192,11 @@ function printPersonalInNewWindow(sid, examKeys, chartImages, returnHtmlOnly){
     +'<meta charset="UTF-8">'
     +'<title>'+escHtml(s.name)+' 성적 분석표</title>'
     +'<style>'
+    +':root{--pr:#7c3aed;--pl:#8b5cf6;--pd:#6d28d9;--pp:rgba(124,58,237,.07);--pp2:rgba(124,58,237,.14);'
+    +'--ac:#f59e0b;--ac2:#fbbf24;--acd:#d97706;--ok:#10b981;--ol:rgba(16,185,129,.1);--ok2:#059669;'
+    +'--ng:#f43f5e;--nl:rgba(244,63,94,.08);--ng2:#e11d48;--wn:#f97316;--wl:rgba(249,115,22,.09);'
+    +'--mu:#64748b;--bo:#e2e8f0;--sf:#f8fafc;--wh:#ffffff;--dk:#0f172a;'
+    +'--g2:linear-gradient(135deg,#f59e0b 0%,#ef4444 100%);--g3:linear-gradient(135deg,#10b981 0%,#06b6d4 100%);}'
     +'*{box-sizing:border-box;margin:0;padding:0;}'
     +'body{font-family:"Noto Sans KR","Malgun Gothic",sans-serif;font-size:13px;color:#1e293b;background:#fff;padding:20px;}'
     +'h1{font-size:18px;font-weight:900;color:#4f46e5;}'
@@ -5868,6 +6215,17 @@ function printPersonalInNewWindow(sid, examKeys, chartImages, returnHtmlOnly){
     +'table{width:100%;border-collapse:collapse;font-size:12px;}'
     +'th{background:#f1f5f9;padding:8px;text-align:left;font-size:11px;color:#475569;}'
     +'td{padding:8px;border-bottom:1px solid #f1f5f9;}'
+    +'.badge{display:inline-block;padding:2px 9px;border-radius:20px;font-size:10px;font-weight:700;white-space:nowrap;letter-spacing:.2px;}'
+    +'.b-hi{background:rgba(244,63,94,.1);color:#f43f5e;border:1px solid rgba(244,63,94,.2);}'
+    +'.b-md{background:rgba(245,158,11,.1);color:#d97706;border:1px solid rgba(245,158,11,.2);}'
+    +'.b-lo{background:rgba(16,185,129,.1);color:#059669;border:1px solid rgba(16,185,129,.2);}'
+    +'.b-tp{background:rgba(168,85,247,.1);color:#9333ea;border:1px solid rgba(168,85,247,.2);}'
+    +'.b-pr{background:rgba(99,102,241,.1);color:#7c3aed;border:1px solid rgba(99,102,241,.2);}'
+    +'.prog-bar{height:7px;background:#e2e8f0;border-radius:10px;overflow:hidden;margin-top:5px;}'
+    +'.prog-fill{height:100%;border-radius:10px;background:linear-gradient(90deg,#7c3aed,#ec4899);}'
+    +'.prog-fill.ok{background:var(--g3);}'
+    +'.prog-fill.wn{background:var(--g2);}'
+    +'.prog-fill.ng{background:linear-gradient(90deg,#f43f5e,#e11d48);}'
     +'@media print{'
     +'  body{padding:10mm;-webkit-print-color-adjust:exact;print-color-adjust:exact;}'
     +'  .section{break-inside:avoid;page-break-inside:avoid;}'
@@ -5878,7 +6236,7 @@ function printPersonalInNewWindow(sid, examKeys, chartImages, returnHtmlOnly){
     // 헤더
     +'<div class="header">'
     +'<div>'
-    +'<div class="logo">🎓 HIGH-ONE 수학학원</div>'
+    +'<img src="'+HIGHONE_LOGO+'" alt="HIGH-ONE 수학학원" style="height:44px;width:auto;object-fit:contain;margin-bottom:6px;display:block;">'
     +'<h1>'+escHtml(s.name)+' 학생 개인 성적 분석표</h1>'
     +'<div style="font-size:11px;color:#94a3b8;margin-top:4px;">'
     +escHtml(s.grade)+(s.teacher?' · 담당: '+escHtml(s.teacher):'')
@@ -5946,29 +6304,17 @@ function printPersonalInNewWindow(sid, examKeys, chartImages, returnHtmlOnly){
     +'<div class="section-title">📈 회차별 성적</div>'
     +trendHtml
     +'</div>':'')
-    // 단원별 분석
+    // 소단원별 분석 (정답률 낮은 순 상위 7개 카드형)
     +(tbodyHtml?
     '<div class="section">'
-    +'<div class="section-title">📚 소단원별 정답률</div>'
-    +'<table><thead><tr><th>소단원</th><th>정답률</th><th>정오답</th><th>달성도</th></tr></thead>'
-    +'<tbody>'+tbodyHtml+'</tbody></table>'
+    +'<div class="section-title">📋 소단원별 취약 분석 (정답률 낮은 순 최대 7개)</div>'
+    +'<div>'+tbodyHtml+'</div>'
     +'</div>':'')
     // 유형별 정답률 (분석 실행 화면과 동일)
-    +((function(){var b=buildPrintTypeBar(typeMap);return b?
-    '<div class="section">'
-    +'<div class="section-title">📊 유형별 정답률</div>'
-    +b
-    +'</div>':'';})())
-    // 유형별 약점 공략법 (분석 실행 화면과 동일)
-    +((function(){var t=buildPrintTypeTips(printWrongs);return t?
-    '<div class="section">'
-    +'<div class="section-title">🎯 유형별 약점 공략법</div>'
-    +t
-    +'</div>':'';})())
-    // 취약 단원
+    // 소단원별 오답 집중 분석 (화면의 buildFocusedWrongList와 동일 — 진단/개선방향/권고사항 포함)
     +(weakHtml?
     '<div class="section">'
-    +'<div class="section-title">💡 집중 보완 단원</div>'
+    +'<div class="section-title">💡 소단원별 오답 집중 분석 (전 회차 통합)</div>'
     +weakHtml
     +'</div>':'')
     // 종합 소견 (분석 실행 화면과 동일한 buildEnhancedOverall 사용)
@@ -6058,7 +6404,7 @@ function doPrintClass(){
     +'@media print{body{padding:10mm;} @page{margin:10mm;}}'
     +'</style></head><body>'
     +'<div class="header">'
-    +'<div class="logo">🎓 HIGH-ONE 수학학원</div>'
+    +'<img src="'+HIGHONE_LOGO+'" alt="HIGH-ONE 수학학원" style="height:40px;width:auto;object-fit:contain;margin-bottom:5px;display:block;">'
     +'<h1>반 전체 성적 분석표</h1>'
     +'<div style="font-size:11px;color:#94a3b8;">'
     +(g?g.label:'')+ ' · ' +(EXAM_LABEL[ek]||ek)
@@ -6085,16 +6431,50 @@ function doPrintClass(){
 function buildRadarChart(id,labels,data,label,bg){
   if(!document.getElementById(id))return;
   destroyChart(id);
+  // 정답률 구간별 포인트 색상 (낮을수록 빨강 → 높을수록 초록)
+  function ptColor(v){ return v>=70?'#10b981':v>=50?'#f59e0b':'#ef4444'; }
+  var pointColors = data.map(ptColor);
   chartInstances[id]=new Chart(document.getElementById(id).getContext('2d'),{
     type:'radar',
     data:{labels:labels,datasets:[{label:label,data:data,
-      backgroundColor:bg||'rgba(37,87,167,0.15)',
-      borderColor:(bg||'rgba(37,87,167,0.15)').replace('0.2','0.8'),
-      borderWidth:2,pointRadius:3}]},
+      backgroundColor:bg||'rgba(37,87,167,0.18)',
+      borderColor:'#2557a7',
+      borderWidth:2.5,
+      pointRadius:5,
+      pointHoverRadius:7,
+      pointBackgroundColor:pointColors,
+      pointBorderColor:'#fff',
+      pointBorderWidth:1.5
+    }]},
     options:{responsive:true,maintainAspectRatio:false,
-      scales:{r:{min:0,max:100,ticks:{stepSize:25,font:{size:9},callback:function(v){return v+'%';}},
-        pointLabels:{font:{size:10,weight:'600'}}}},
-      plugins:{legend:{display:false}}}
+      scales:{r:{min:0,max:100,
+        ticks:{stepSize:25,font:{size:9,weight:'600'},color:'#64748b',backdropColor:'rgba(255,255,255,.85)',showLabelBackdrop:true,callback:function(v){return v+'%';}},
+        pointLabels:{font:{size:10.5,weight:'700'},color:'#1a3a6b'},
+        grid:{color:'rgba(37,87,167,0.18)',lineWidth:1},
+        angleLines:{color:'rgba(37,87,167,0.25)',lineWidth:1.2}
+      }},
+      plugins:{
+        legend:{display:false},
+        tooltip:{callbacks:{label:function(ctx){return ' '+ctx.label+': '+ctx.parsed.r+'%';}}}
+      }
+    },
+    plugins:[{
+      id:'radarValueLabels_'+id,
+      afterDatasetsDraw:function(chart){
+        var ctx=chart.ctx, meta=chart.getDatasetMeta(0);
+        if(!meta || !meta.data) return;
+        ctx.save();
+        ctx.font='800 10px Pretendard, sans-serif';
+        ctx.textAlign='center';
+        ctx.textBaseline='bottom';
+        meta.data.forEach(function(pt,i){
+          var v=data[i];
+          ctx.fillStyle=ptColor(v);
+          ctx.fillText(v+'%', pt.x, pt.y-8);
+        });
+        ctx.restore();
+      }
+    }]
   });
 }
 
@@ -6368,53 +6748,157 @@ function updatePhoneStatus(){
 
 function renderShareStudents(){
   var grade=document.getElementById('shareGradeFilter').value;
-  var sel=document.getElementById('shareStudentSel');
-  sel.innerHTML='<option value="">-- 학생 선택 --</option>';
-  // 권한: 일반 선생님은 본인 반만 / 관리자는 선택한 선생님으로 필터
+  var grid=document.getElementById('shareStudentGrid');
+  var countEl=document.getElementById('shareStudentCount');
+  if(!grid) return;
+
+  // 학년 미선택 시 안내만 표시
+  if(!grade){
+    if(countEl) countEl.textContent='';
+    grid.innerHTML='<div style="grid-column:1/-1;text-align:center;padding:32px 16px;">'
+      +'<div style="font-size:32px;margin-bottom:10px;">🎓</div>'
+      +'<div style="font-size:13px;font-weight:700;color:var(--dk);margin-bottom:4px;">학년을 선택해주세요</div>'
+      +'<div style="font-size:11px;color:var(--mu);">위 드롭다운에서 학년을 선택하면 해당 학생 목록이 나타납니다</div>'
+      +'</div>';
+    clearShareStudent();
+    return;
+  }
   var myName=(typeof getMyTeacherName==='function')?getMyTeacherName():null;
   var ts=document.getElementById('shareTeacherSel');
-  var pickTeacher=(!myName && ts)?ts.value:''; // 관리자가 고른 선생님
-  DB.students.filter(function(s){
+  var pickTeacher=(!myName && ts)?ts.value:'';
+  var students=DB.students.filter(function(s){
     if(grade && GRADE_KEY_MAP[s.grade]!==grade) return false;
     if(myName){
-      // 일반 선생님: 본인 반만
       if(s.teacher!==myName) return false;
     } else if(pickTeacher){
-      // 관리자: 선택한 선생님
       if(pickTeacher==='__none__'){ if(s.teacher) return false; }
       else if(s.teacher!==pickTeacher) return false;
     }
     return true;
-  }).forEach(function(s){
-    sel.innerHTML+='<option value="'+s.id+'">'+escHtml(s.name)+' ('+escHtml(s.grade||'')+')'+(s.parentPhone?' 📞':'')+'</option>';
   });
-  document.getElementById('shareResultBox').style.display='none';
-  document.getElementById('shareExamList').innerHTML='학생을 먼저 선택하세요';
-  var pinfo=document.getElementById('shareParentInfo'); if(pinfo) pinfo.style.display='none';
-}
-
-function onShareStudentChange(){
-  var sid=document.getElementById('shareStudentSel').value;
-  document.getElementById('shareResultBox').style.display='none';
-  var pinfo=document.getElementById('shareParentInfo');
-  if(!sid){
-    document.getElementById('shareExamList').innerHTML='학생을 먼저 선택하세요';
-    if(pinfo) pinfo.style.display='none';
+  if(countEl) countEl.textContent=students.length+'명';
+  if(!students.length){
+    grid.innerHTML='<div style="grid-column:1/-1;text-align:center;padding:24px;color:var(--mu);font-size:12px;">해당 조건의 학생이 없습니다</div>';
     return;
   }
-  // 보호자 연락처 자동 반영 안내
+  grid.innerHTML=students.map(function(s){
+    var scoreCount=Object.keys(DB.scores[s.id]||{}).filter(function(k){return DB.exams[k];}).length;
+    var trend=getScoreTrend(s.id);
+    var trendHtml=trend?scoreTrendBadge(trend,{small:true}):'';
+    var phoneTag=s.parentPhone?'<span title="연락처:'+escHtml(s.parentPhone)+'" style="font-size:9px;color:var(--ok);font-weight:700;">📞</span>':'';
+    var gradeKey=GRADE_KEY_MAP[s.grade];
+    var mainGroup=pickMainGroupForStudent?pickMainGroupForStudent(s.id,gradeKey):null;
+    var dotsHtml='';
+    if(mainGroup){
+      dotsHtml='<div style="margin-top:5px;display:flex;align-items:center;gap:3px;flex-wrap:wrap;">'
+        +'<span style="font-size:8px;color:var(--mu);">'+escHtml(mainGroup.glabel)+'</span>'
+        +attendanceDotsHtml(s.id,mainGroup,{size:7})+'</div>';
+    }
+    // 선생님(또는 학년)별 색상 팔레트
+    var CARD_PALETTES=[
+      {bg:'#f0f4ff',border:'#c7d7fd',bar:'#4f7df3',text:'#2d4ea2'},
+      {bg:'#fdf0fb',border:'#f0c6ee',bar:'#c855c0',text:'#8b2e87'},
+      {bg:'#f0fdf6',border:'#b8f0d0',bar:'#1aaa65',text:'#156b41'},
+      {bg:'#fff8f0',border:'#fdd9b0',bar:'#f07d20',text:'#a04e10'},
+      {bg:'#fef2f2',border:'#fecaca',bar:'#ef4444',text:'#991b1b'},
+      {bg:'#f5f0ff',border:'#ddd0fd',bar:'#7c3aed',text:'#4c1d95'},
+      {bg:'#f0fffe',border:'#b0eae7',bar:'#0d9488',text:'#0a5e58'},
+      {bg:'#fffbeb',border:'#fde68a',bar:'#d97706',text:'#78350f'},
+    ];
+    // 선생님 목록에서 인덱스 결정
+    var allTeachers=(DB.teachers&&DB.teachers.length)?DB.teachers.slice():[];
+    DB.students.forEach(function(x){if(x.teacher&&allTeachers.indexOf(x.teacher)<0)allTeachers.push(x.teacher);});
+    allTeachers.sort();
+    var colorKey=s.teacher||s.grade||'';
+    var colorIdx=allTeachers.indexOf(colorKey);
+    if(colorIdx<0) colorIdx=Math.abs((colorKey).split('').reduce(function(acc,c){return acc+c.charCodeAt(0);},0))%CARD_PALETTES.length;
+    else colorIdx=colorIdx%CARD_PALETTES.length;
+    var pal=CARD_PALETTES[colorIdx];
+
+    return '<div class="share-std-card" data-sid="'+s.id+'" onclick="onShareCardClick(\''+s.id+'\')" style="'
+      +'border:2px solid '+pal.border+';border-radius:12px;padding:0;cursor:pointer;transition:all .18s;'
+      +'background:'+pal.bg+';position:relative;overflow:hidden;">'
+      // 상단 컬러 바
+      +'<div style="height:4px;background:'+pal.bar+';border-radius:12px 12px 0 0;"></div>'
+      +'<div style="padding:10px 12px;">'
+      +'<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">'
+      +'<span style="font-size:14px;font-weight:900;color:'+pal.text+';flex:1;">'+escHtml(s.name)+'</span>'
+      +phoneTag
+      +(trendHtml?'<span style="display:inline-flex;align-items:center;gap:2px;">'+trendHtml+'</span>':'')
+      +'</div>'
+      +'<div style="font-size:10px;color:#64748b;margin-bottom:2px;">'+escHtml(s.grade||'')+(s.school?' · '+escHtml(s.school):'')+'</div>'
+      +(s.teacher?'<div style="font-size:10px;color:'+pal.text+';font-weight:700;opacity:.8;">👩‍🏫 '+escHtml(s.teacher)+'</div>':'')
+      +'<div style="font-size:10px;color:#64748b;margin-top:4px;">시험 <b style="color:'+pal.text+';">'+scoreCount+'</b>회</div>'
+      +dotsHtml
+      +'</div></div>';
+  }).join('');
+  // 패널 초기화
+  clearShareStudent();
+}
+
+function onShareCardClick(sid){
+  // 이전 선택 카드 스타일 제거
+  document.querySelectorAll('.share-std-card').forEach(function(c){
+    c.style.outline='none';
+    c.style.boxShadow='';
+    c.style.transform='';
+  });
+  // 선택 카드 하이라이트 (outline으로 원래 border-color 유지하면서 강조)
+  var card=document.querySelector('.share-std-card[data-sid="'+sid+'"]');
+  if(card){
+    card.style.outline='3px solid var(--pr)';
+    card.style.outlineOffset='-1px';
+    card.style.boxShadow='0 6px 20px rgba(124,58,237,.25)';
+    card.style.transform='translateY(-2px)';
+  }
+  // 숨긴 select 동기화 (genShareLink 등이 참조)
+  var sel=document.getElementById('shareStudentSel');
+  if(sel){ sel.innerHTML='<option value="'+sid+'">'+sid+'</option>'; sel.value=sid; }
+  onShareStudentChange(sid);
+}
+
+function clearShareStudent(){
+  document.querySelectorAll('.share-std-card').forEach(function(c){
+    c.style.outline='none';
+    c.style.boxShadow='';
+    c.style.transform='';
+  });
+  var sel=document.getElementById('shareStudentSel');
+  if(sel){ sel.innerHTML='<option value=""></option>'; sel.value=''; }
+  var panel=document.getElementById('sharePanel');
+  if(panel) panel.style.display='none';
+  var rb=document.getElementById('shareResultBox');
+  if(rb) rb.style.display='none';
+}
+
+function onShareStudentChange(sid){
+  sid=sid||document.getElementById('shareStudentSel').value;
+  var panel=document.getElementById('sharePanel');
+  var pinfo=document.getElementById('shareParentInfo');
+  var rb=document.getElementById('shareResultBox');
+  if(rb) rb.style.display='none';
+  if(!sid){
+    if(panel) panel.style.display='none';
+    return;
+  }
+  if(panel) panel.style.display='block';
+  // 학생 이름 표시
   var st=DB.students.find(function(x){return x.id===sid;});
+  var nameEl=document.getElementById('sharePanelStudentName');
+  if(nameEl) nameEl.textContent=(st?st.name:'')+' 학생 · 시험 선택';
+  // 보호자 연락처
   if(pinfo){
     if(st && st.parentPhone){
       pinfo.style.display='block';
-      pinfo.innerHTML='📞 보호자 연락처 '+st.parentPhone+' · 리포트 암호: 뒷 4자리('+st.parentPhone.slice(-4)+')';
+      pinfo.innerHTML='📞 보호자 연락처 '+escHtml(st.parentPhone)+' · 리포트 암호: 뒷 4자리('+st.parentPhone.slice(-4)+')';
       pinfo.style.background='var(--pp)'; pinfo.style.color='var(--pr)';
     } else {
       pinfo.style.display='block';
-      pinfo.innerHTML='⚠️ 이 학생은 보호자 연락처가 없습니다. 학생 관리에서 등록하면 리포트에 암호가 적용됩니다.';
+      pinfo.innerHTML='⚠️ 보호자 연락처 미등록 — 학생 관리에서 등록하면 리포트에 암호가 설정됩니다.';
       pinfo.style.background='rgba(244,63,94,.08)'; pinfo.style.color='var(--ng)';
     }
   }
+  // 시험 목록
   var keys=Object.keys(DB.scores[sid]||{}).filter(function(k){return DB.exams[k];});
   var ctrl=document.getElementById('shareExamControls');
   if(!keys.length){
@@ -6428,7 +6912,6 @@ function onShareStudentChange(){
       +'<span style="font-size:12px;color:var(--tx);font-weight:600;">'+escHtml(EXAM_LABEL[k]||k)+'</span></label>';
   }).join('');
   if(ctrl) ctrl.style.display='flex';
-  // 초기 체크 상태 스타일 반영
   document.querySelectorAll('.share-cb').forEach(function(cb){ updateShareItemStyle(cb); });
 }
 
@@ -6856,8 +7339,12 @@ function renderParentReport(data){
     mk('pcv_type',{type:'doughnut',data:{labels:typeArr.map(function(t){return t.type;}),datasets:[{data:typeArr.map(function(t){return t.pct;}),backgroundColor:['#7c3aed','#ec4899','#f59e0b','#10b981','#3b82f6','#0ea5e9','#6b7280'],borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:10}}}}}});
     // 문항 유형별 정답률 (막대)
     mk('pcv_cog',{type:'bar',data:{labels:typeArr.map(function(t){return t.type;}),datasets:[{data:typeArr.map(function(t){return t.pct;}),backgroundColor:typeArr.map(function(t){return bc(t.pct);}),borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{min:0,max:100,ticks:{callback:function(v){return v+'%';}}}}}});
-    // 단원별 레이더
-    mk('pcv_radar',{type:'radar',data:{labels:unitArr.map(function(u){return u.unit;}),datasets:[{data:unitArr.map(function(u){return u.pct;}),backgroundColor:'rgba(37,87,167,0.15)',borderColor:'rgba(37,87,167,0.8)',borderWidth:2,pointRadius:3}]},options:{responsive:true,maintainAspectRatio:false,scales:{r:{min:0,max:100,ticks:{stepSize:25,font:{size:9}},pointLabels:{font:{size:9,weight:'600'}}}},plugins:{legend:{display:false}}}});
+    // 단원별 레이더 (개인분석지와 동일한 buildRadarChart 재사용 — 포인트 색상/라벨 일치)
+    if(typeof buildRadarChart==='function'){
+      buildRadarChart('pcv_radar', unitArr.map(function(u){return u.unit;}), unitArr.map(function(u){return u.pct;}), '단원', 'rgba(37,87,167,0.18)');
+    } else {
+      mk('pcv_radar',{type:'radar',data:{labels:unitArr.map(function(u){return u.unit;}),datasets:[{data:unitArr.map(function(u){return u.pct;}),backgroundColor:'rgba(37,87,167,0.15)',borderColor:'rgba(37,87,167,0.8)',borderWidth:2,pointRadius:3}]},options:{responsive:true,maintainAspectRatio:false,scales:{r:{min:0,max:100,ticks:{stepSize:25,font:{size:9}},pointLabels:{font:{size:9,weight:'600'}}}},plugins:{legend:{display:false}}}});
+    }
     // 누적데이터 기준 학생 위치 분석 (개인분석지 renderNormChart와 동일)
     if(document.getElementById('pcv_norm')){
       var mu=60, sigma=18;
