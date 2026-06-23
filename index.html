@@ -1009,7 +1009,7 @@ body::before{content:'';position:fixed;inset:0;background:
       • 분석표 출력: 자동으로 분석 탭으로 이동 후 인쇄<br>
       • PDF 저장: 인쇄 → 대상을 'PDF로 저장' 선택
     </div>
-    <div style="margin-top:12px;padding:12px 16px;background:rgba(244,63,94,.06);border-radius:9px;border:1.5px solid rgba(244,63,94,.18);">
+    <div id="adminDataMgmt" style="display:none;margin-top:12px;padding:12px 16px;background:rgba(244,63,94,.06);border-radius:9px;border:1.5px solid rgba(244,63,94,.18);">
       <div style="font-size:11px;font-weight:800;color:var(--ng);margin-bottom:7px;">⚙️ 데이터 관리</div>
       <div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:10px;">
         <button class="btn btn-ng btn-sm" onclick="resetExamData()">🔄 시험지 데이터 초기화</button>
@@ -4537,6 +4537,10 @@ function initPrintTab(){
   GRADE_LIST.forEach(function(g){ pg.innerHTML += '<option value="'+g.key+'">'+g.label+'</option>'; });
 
   setPrintMode('exam');
+
+  // 데이터 관리 영역: 관리자(어드민)만 표시
+  var adminBox = document.getElementById('adminDataMgmt');
+  if(adminBox) adminBox.style.display = myName ? 'none' : 'block';
 }
 
 // 선생님 목록 헬퍼 (출력 탭 공통)
