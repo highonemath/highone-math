@@ -1011,9 +1011,23 @@ body::before{content:'';position:fixed;inset:0;background:
     </div>
     <div style="margin-top:12px;padding:12px 16px;background:rgba(244,63,94,.06);border-radius:9px;border:1.5px solid rgba(244,63,94,.18);">
       <div style="font-size:11px;font-weight:800;color:var(--ng);margin-bottom:7px;">⚙️ 데이터 관리</div>
-      <div style="display:flex;gap:7px;flex-wrap:wrap;">
+      <div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:10px;">
         <button class="btn btn-ng btn-sm" onclick="resetExamData()">🔄 시험지 데이터 초기화</button>
         <button class="btn btn-mu btn-sm" onclick="clearAllData()">⚠️ 전체 초기화</button>
+      </div>
+      <div style="border-top:1px solid rgba(244,63,94,.18);padding-top:10px;">
+        <div style="font-size:11px;font-weight:800;color:#2557a7;margin-bottom:7px;">💾 데이터 백업 / 복원</div>
+        <div style="font-size:10px;color:var(--mu);margin-bottom:8px;">
+          index.html 교체 후에도 데이터는 Firebase 서버에 안전하게 보존됩니다.<br>
+          혹시 모를 상황에 대비해 정기적으로 백업을 권장합니다.
+        </div>
+        <div style="display:flex;gap:7px;flex-wrap:wrap;">
+          <button class="btn btn-sm" onclick="backupData()" style="background:#2557a7;color:#fff;font-weight:700;">📥 전체 백업 (JSON 다운로드)</button>
+          <label class="btn btn-sm" style="background:#059669;color:#fff;font-weight:700;cursor:pointer;">
+            📤 백업 복원 (JSON 업로드)
+            <input type="file" accept=".json" onchange="restoreData(event)" style="display:none;">
+          </label>
+        </div>
       </div>
     </div>
   </div>
@@ -1725,9 +1739,16 @@ function buildStrengthList(ex, ans) {
 
 // 종합 소견 강화 버전 (DB 연동)
 function buildEnhancedOverall(ex, ans, s, pct, lv) {
+  // 안전 클램프: 서술형 부분점수 계산 오류 등으로 100% 초과 방지
+  pct = Math.min(100, Math.max(0, Math.round(pct)));
+
+  var cs = calcExamScore(ans, ex);
   var items = analyzeAllItems(ex, ans);
   var wrongItems = items.filter(function(r){return r.isWrong;});
   var rightItems = items.filter(function(r){return !r.isWrong;});
+  var wrongCnt = wrongItems.length;
+  var rightCnt = rightItems.length;
+  var totalCnt = items.length;
 
   // 취약 소단원 집계
   var weakUnits = {};
@@ -1750,53 +1771,129 @@ function buildEnhancedOverall(ex, ans, s, pct, lv) {
   var topDiff = Object.keys(diffMap).sort(function(a,b){return diffMap[b]-diffMap[a];})[0]||'';
 
   // 강점 소단원 (난이도 상/최상 정답)
-  var strongUnits = rightItems.filter(function(r){return r.question.diff==='상'||r.question.diff==='최상';}).map(function(r){return r.question.unit;}).filter(function(v,i,a){return a.indexOf(v)===i;}).slice(0,2);
+  var strongUnits = rightItems
+    .filter(function(r){return r.question.diff==='상'||r.question.diff==='최상';})
+    .map(function(r){return r.question.unit||r.question.major||'';})
+    .filter(function(v,i,a){return v&&a.indexOf(v)===i;})
+    .slice(0,2);
 
-  var text = '<b style="font-size:14px;">'+escHtml(s.name)+'</b> 학생 종합 분석 소견<br><br>';
+  var name = escHtml(s.name);
+  var text = '<b style="font-size:14px;">'+name+'</b> 학생 종합 분석 소견<br><br>';
 
-  // 성취 수준 평가
-  text += '이번 시험에서 <b>'+pct+'%</b>의 정답률로 <b>'+lv.title.split(' ')[1]+'</b> 수준에 해당합니다. ';
-  if (pct>=90) text += '거의 모든 문항을 정확히 해결하는 탁월한 성취를 보였습니다. 단순 문제 풀이를 넘어 사고의 깊이를 더하는 학습이 필요한 단계입니다.';
-  else if (pct>=80) text += '전반적으로 개념 이해와 기본 계산이 안정적이며, 일부 고난도 문항에서만 실수가 나타나고 있습니다. 조금 더 집중하면 최상위권에 도달할 수 있습니다.';
-  else if (pct>=65) text += '기본 개념은 대체로 잘 이해하고 있지만, 응용·추론 문제에서 아직 더 훈련이 필요합니다. 복습과 유형 연습을 병행하면 빠른 성장이 가능합니다.';
-  else if (pct>=50) text += '기초 개념 일부는 갖추어져 있으나, 계산 오류와 개념 혼동이 함께 나타나고 있습니다. 기본기부터 차근차근 다시 다듬는 과정이 필요합니다.';
-  else text += '기초 개념 이해부터 다시 점검이 필요한 상태입니다. 포기하지 않고 꾸준히 기초를 쌓아가는 것이 무엇보다 중요합니다.';
+  // ── ① 성취 수준 평가 (정답률 기반 상세 멘트)
+  text += '이번 시험에서 <b>'+pct+'%</b>의 정답률('+rightCnt+'문항 정답 / 전체 '+totalCnt+'문항)을 기록하였습니다. ';
+
+  if (pct >= 95) {
+    text += '거의 완벽에 가까운 성취를 보인 탁월한 결과입니다. '
+      + name+' 학생은 기초 개념부터 고난도 응용 문항까지 전 범위를 안정적으로 소화하고 있습니다. '
+      + '이 수준에서는 단순 반복보다 사고의 깊이를 더하는 방향이 중요합니다. '
+      + '오답이 발생한 문항에 집중하여 왜 틀렸는지를 분석하고, 유사 심화 문항으로 마무리 점검을 해보세요.';
+  } else if (pct >= 90) {
+    text += '매우 우수한 성취 수준입니다. '
+      + '전반적인 개념 이해와 문제 적용 능력이 탄탄하게 갖추어져 있으며, '
+      + name+' 학생은 대부분의 유형에서 안정적인 정답률을 유지하고 있습니다. '
+      + '남은 오답 '+(wrongCnt)+'문항은 대체로 고난도 또는 세부 개념의 혼동에서 발생한 것으로 보입니다. '
+      + '틀린 문항을 유형별로 분류하고 각각의 원인을 파악하여 교정하면 최상위권에 도달할 수 있습니다.';
+  } else if (pct >= 80) {
+    text += '전반적으로 개념 이해와 기본 계산이 안정적이며 좋은 성취를 보이고 있습니다. '
+      + name+' 학생은 기본~중간 수준 문항의 정답률이 높으나, '
+      + '일부 고난도 문항과 복합 유형에서 실수가 나타나고 있습니다. '
+      + '오답 '+wrongCnt+'문항의 풀이 과정을 다시 검토하고, 틀린 소단원에서 유사 문항을 3~5문항씩 추가로 풀어보며 완성도를 높이면 더욱 좋은 결과를 기대할 수 있습니다.';
+  } else if (pct >= 70) {
+    text += '기본 개념은 대체로 이해하고 있으나, 응용 및 추론 문제에서 정답률이 낮아지는 경향이 있습니다. '
+      + name+' 학생은 개념을 알고 있어도 실전 문항에서의 적용 과정에서 실수가 발생하고 있습니다. '
+      + '전체 '+totalCnt+'문항 중 '+wrongCnt+'문항을 틀렸으며, 특히 취약 단원에서 오답이 집중되고 있습니다. '
+      + '복습과 유형별 집중 연습을 병행하면 빠른 성장이 가능한 수준이므로 꾸준한 노력이 필요합니다.';
+  } else if (pct >= 60) {
+    text += '기초 개념 일부는 갖추어져 있으나, 개념 혼동과 계산 오류가 함께 나타나고 있습니다. '
+      + name+' 학생은 '+totalCnt+'문항 중 '+wrongCnt+'문항을 틀렸으며, '
+      + '오답이 특정 단원에 집중되어 있어 해당 단원의 집중 보완이 시급합니다. '
+      + '기본기부터 차근차근 다시 다듬는 과정이 필요하며, '
+      + '개념 확인 → 유형 연습 → 발전 문항 순서로 단계별 재학습을 권장합니다.';
+  } else if (pct >= 50) {
+    text += '기초 개념의 이해가 부분적으로만 이루어져 있으며, 문항 적용에 어려움이 큰 상태입니다. '
+      + name+' 학생은 전체 '+totalCnt+'문항 중 '+wrongCnt+'문항을 틀렸으며, '
+      + '여러 단원에 걸쳐 오답이 분산되어 있어 전반적인 학습 보완이 필요합니다. '
+      + '교과서 예제부터 다시 시작하여 각 단원의 핵심 개념을 완전히 이해한 뒤 문제를 풀어나가는 방식을 권장합니다.';
+  } else if (pct >= 30) {
+    text += '기초 개념 이해부터 전면적인 점검이 필요한 상태입니다. '
+      + name+' 학생은 전체 '+totalCnt+'문항 중 '+wrongCnt+'문항을 틀렸으며, '
+      + '현재 기초가 충분히 쌓이지 않은 단계로 보입니다. '
+      + '포기하지 않는 것이 가장 중요합니다. 매일 일정 시간 개념 복습과 기본 문제 풀이를 반복하고, '
+      + '선생님과 함께 취약한 부분을 체계적으로 점검해 나가길 권장합니다.';
+  } else {
+    text += '현재 수학 기초 전반에 걸쳐 집중적인 학습 지원이 필요한 상태입니다. '
+      + name+' 학생은 전체 '+totalCnt+'문항 중 '+wrongCnt+'문항을 틀렸습니다. '
+      + '지금 당장의 점수보다는 매 수업에서 한 가지씩 개념을 확실히 이해하는 것을 목표로 삼으세요. '
+      + '작은 성취를 반복하는 것이 수학적 자신감을 회복하는 가장 빠른 길입니다.';
+  }
 
   text += '<br><br>';
 
-  // 취약 소단원 분석
+  // ── ② 취약 소단원 분석
   if (topWeak.length > 0) {
-    text += '<b>【취약 단원】</b> ';
+    text += '<b>【취약 단원 분석】</b><br>';
     topWeak.forEach(function(u, i){
-      text += (i+1)+'위 <b>'+escHtml(u)+'</b>(오답 '+weakUnits[u].count+'문항)';
-      if (i < topWeak.length-1) text += ', ';
+      var info = weakUnits[u];
+      var mainDiff = info.diffs.sort(function(a,b){
+        var order={'최하':0,'하':1,'중':2,'상':3,'최상':4};
+        return (order[b]||2)-(order[a]||2);
+      })[0]||'중';
+      text += '&nbsp;&nbsp;'+(i+1)+'위 <b>'+escHtml(u)+'</b> — 오답 '+info.count+'문항'
+        +' (주요 난이도: '+escHtml(mainDiff)+'). ';
+      if(mainDiff==='하'||mainDiff==='최하'){
+        text += '기초 개념 단계부터 재확인이 필요합니다. ';
+      } else if(mainDiff==='중'){
+        text += '개념은 알고 있으나 적용 과정에서의 실수가 원인으로 보입니다. ';
+      } else {
+        text += '고난도 응용 문항에서의 전략적 접근이 필요합니다. ';
+      }
+      text += '<br>';
     });
-    text += ' 순으로 집중적인 보완이 필요합니다.';
-    text += '<br>';
   }
 
-  // 취약 유형·난이도
+  // ── ③ 오답 패턴 분석
   if (topType || topDiff) {
     text += '<b>【오답 패턴】</b> ';
-    if (topType) text += '<b>'+escHtml(topType)+'</b> 유형에서 오답이 집중되고 있으며, ';
-    if (topDiff) text += '<b>'+escHtml(topDiff)+'</b> 난이도 문항의 정답률이 상대적으로 낮습니다.';
+    if (topType && topDiff) {
+      text += '<b>'+escHtml(topDiff)+'</b> 난이도의 <b>'+escHtml(topType)+'</b> 유형에서 오답이 가장 많이 집중되었습니다. ';
+      if(topType==='서술형') text += '풀이 과정을 단계별로 완전히 서술하는 연습이 필요합니다. ';
+      else if(topType.indexOf('계산')>=0) text += '계산 과정을 필산으로 정리하고 검산하는 습관이 필요합니다. ';
+      else if(topType.indexOf('추론')>=0||topType.indexOf('응용')>=0) text += '문제 조건을 식으로 변환하는 연습이 필요합니다. ';
+    } else if (topType) {
+      text += '<b>'+escHtml(topType)+'</b> 유형에서 오답이 집중되고 있습니다. ';
+    } else if (topDiff) {
+      text += '<b>'+escHtml(topDiff)+'</b> 난이도 문항의 정답률이 상대적으로 낮습니다. ';
+    }
     text += '<br>';
   }
 
-  // 강점
+  // ── ④ 강점 단원
   if (strongUnits.length > 0) {
     text += '<b>【강점 단원】</b> ';
-    strongUnits.forEach(function(u,i){ text += '<b>'+escHtml(u)+'</b>'+(i<strongUnits.length-1?', ':''); });
-    text += ' 등 고난도 문항에서도 정확히 풀어내는 강점을 보이고 있습니다.<br>';
+    text += strongUnits.map(function(u){return '<b>'+escHtml(u)+'</b>';}).join(', ');
+    text += ' 단원의 고난도 문항에서도 정확히 풀어내는 강점을 보이고 있습니다. 이 강점을 바탕으로 취약 단원 학습에도 자신감을 가져보세요.<br>';
   }
 
   text += '<br>';
 
-  // 학습 방향 권고
-  text += '💡 <b>학습 방향 권고:</b> ';
-  if (pct>=80) text += '취약 문항의 소단원 개념을 확인하고 유사 난이도의 심화 문제로 마무리 보완을 해보세요. 틀린 문제는 반드시 풀이 과정을 다시 써보고 이해가 완전히 됐는지 확인해야 합니다.';
-  else if (pct>=60) text += '오답이 집중된 소단원의 개념을 교재에서 다시 확인하고, 기본 → 유형 → 발전 순서로 단계별 재학습을 권장합니다. 주 2~3회 오답 노트를 작성하는 습관을 시작해보세요.';
-  else text += '오답이 많은 단원부터 교재의 개념 설명을 다시 읽고, 예제 문제를 모두 손으로 직접 풀어보세요. 매일 짧은 시간이라도 꾸준히 반복하는 것이 가장 중요합니다. 선생님과 함께 부족한 부분을 정기적으로 점검해 나가길 권합니다.';
+  // ── ⑤ 구체적 학습 방향 권고
+  text += '💡 <b>학습 방향 권고</b><br>';
+  if (pct >= 90) {
+    text += '&nbsp;&nbsp;• 오답 '+wrongCnt+'문항의 풀이 과정을 직접 다시 써보고, 어느 단계에서 실수했는지 원인을 기록하세요.<br>'
+      + '&nbsp;&nbsp;• 유사 심화 문항으로 완성도를 높이고, 한 단원씩 마무리 점검을 해나가세요.<br>'
+      + '&nbsp;&nbsp;• 현재 실력을 유지하면서 서술형 풀이의 완성도를 더 높이는 방향을 권장합니다.<br>';
+  } else if (pct >= 70) {
+    text += '&nbsp;&nbsp;• 오답이 집중된 단원의 교과서 개념 설명을 다시 읽고 예제를 손으로 직접 풀어보세요.<br>'
+      + '&nbsp;&nbsp;• 기본 → 유형 → 발전 문항 순서로 단계별 재학습을 진행하세요.<br>'
+      + '&nbsp;&nbsp;• 오답 노트를 작성하여 틀린 이유(개념 부족 / 계산 실수 / 문제 오독)를 스스로 분류해보세요.<br>'
+      + '&nbsp;&nbsp;• 주 2~3회 이상 해당 단원 문제를 꾸준히 풀어 정착시키는 것이 중요합니다.<br>';
+  } else {
+    text += '&nbsp;&nbsp;• 취약 단원의 교과서 개념 정의부터 다시 읽고, 예제 문항을 모두 손으로 풀어보세요.<br>'
+      + '&nbsp;&nbsp;• 한 번에 여러 단원을 공부하기보다 한 단원씩 완전히 이해한 뒤 넘어가세요.<br>'
+      + '&nbsp;&nbsp;• 선생님과 함께 매주 1~2개의 취약 단원을 정기적으로 점검하는 루틴을 만들어보세요.<br>'
+      + '&nbsp;&nbsp;• 매일 짧은 시간이라도 꾸준한 반복이 가장 효과적입니다. 작은 목표부터 달성해 나가세요.<br>';
+  }
 
   return text;
 }
@@ -2170,7 +2267,13 @@ function loadDB(){
     if(!DB.teachers) DB.teachers=[];
   }catch(e){}
   
-  // 기존 불필요한 시험지 정리
+  // ─── 기존 불필요한 시험지 정리 (안전 모드: 성적 있는 시험지는 절대 삭제 안 함) ───
+  // 성적 데이터가 등록된 시험키 목록 수집
+  var examsWithScores = {};
+  Object.keys(DB.scores||{}).forEach(function(sid){
+    Object.keys(DB.scores[sid]||{}).forEach(function(ek){ examsWithScores[ek]=true; });
+  });
+
   var keysToKeep = [
     '고2-대수-2-6회',
     '중2-1기-1회','중2-1기-2회','중2-1기-3회',
@@ -2185,10 +2288,10 @@ function loadDB(){
     '고1-공수1-1기-6회'
   ];
 
-  // ─── 중3-1중 1~6회: PDF 없는 기본값만 초기화 (PDF 업로드된 것은 보존) ───
+  // ─── 중3-1중 1~6회: 안전하게만 정리 ───
   ['중3-1중-1회','중3-1중-2회','중3-1중-3회',
    '중3-1중-4회','중3-1중-5회','중3-1중-6회'].forEach(function(k){
-    // PDF 업로드된 시험지는 절대 삭제하지 않음
+    if(examsWithScores[k]) return; // 성적 있으면 절대 삭제 안 함
     var hasPdf = DB.pdfFlags && DB.pdfFlags[k];
     var hasRealData = DB.exams[k] && DB.exams[k].questions && DB.exams[k].questions.length > 0
       && DB.exams[k].questions[0].comment !== '등록대기';
@@ -2196,7 +2299,7 @@ function loadDB(){
   });
   Object.keys(DB.exams).forEach(function(key){
     if(keysToKeep.indexOf(key) === -1 && DB.exams[key]){
-      // PDF 업로드된 시험지는 절대 삭제하지 않음
+      if(examsWithScores[key]) return; // 성적 있으면 절대 삭제 안 함
       var hasPdf = DB.pdfFlags && DB.pdfFlags[key];
       if(hasPdf) return;
       // 기본값(total:20, comment:'등록대기')만 제거
@@ -2205,7 +2308,7 @@ function loadDB(){
         if(isDefault) delete DB.exams[key];
       }
     }
-  })
+  });
   
   
   // 중2-1학기 기말고사 1~6회 시험지 추가
@@ -2838,6 +2941,53 @@ function loadDB(){
     };
   }
 }
+function backupData(){
+  try{
+    var payload = {
+      _backupDate: new Date().toISOString(),
+      _version: 'v4',
+      students: DB.students||[],
+      exams: DB.exams||{},
+      scores: DB.scores||{},
+      teachers: DB.teachers||[],
+      pdfFlags: DB.pdfFlags||{}
+    };
+    var blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
+    var url  = URL.createObjectURL(blob);
+    var a    = document.createElement('a');
+    var date = new Date().toLocaleDateString('ko-KR',{year:'2-digit',month:'2-digit',day:'2-digit'}).replace(/\./g,'').replace(/ /g,'-');
+    a.href = url;
+    a.download = 'highone_backup_'+date+'.json';
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast('백업 파일이 다운로드되었습니다 ✓','ok',3000);
+  }catch(e){ toast('백업 실패: '+e.message,'ng'); }
+}
+
+function restoreData(event){
+  var file = event.target.files[0];
+  if(!file) return;
+  if(!confirm('⚠️ 백업 파일로 복원하면 현재 데이터가 덮어씌워집니다.\n계속하시겠습니까?')) return;
+  var reader = new FileReader();
+  reader.onload = function(e){
+    try{
+      var data = JSON.parse(e.target.result);
+      if(!data.students && !data.scores){ toast('올바른 백업 파일이 아닙니다','ng'); return; }
+      DB.students = data.students || [];
+      DB.exams    = data.exams    || {};
+      DB.scores   = data.scores   || {};
+      DB.teachers = data.teachers || [];
+      DB.pdfFlags = data.pdfFlags || {};
+      saveDB();
+      toast('복원 완료! ('+DB.students.length+'명, 시험지 '+Object.keys(DB.exams).length+'종)','ok',4000);
+      setTimeout(function(){ location.reload(); }, 1500);
+    }catch(err){ toast('복원 실패: '+err.message,'ng'); }
+  };
+  reader.readAsText(file);
+  event.target.value = ''; // 파일 선택 초기화
+}
+
 function saveDB(){
   // 로컬 백업 (오프라인 대비)
   try{ localStorage.setItem('highone_db', JSON.stringify(DB)); }catch(e){}
@@ -5508,10 +5658,10 @@ function runPersonalAnalysis(){
   examKeys.forEach(function(k){
     var ex  = DB.exams[k];
     var ans = allScores[k];
-    var ok  = calcExamScore(ans,ex).got;
-    totalRight += ok; totalQ += ex.total;
+    var cs  = calcExamScore(ans,ex);
+    totalRight += cs.got; totalQ += cs.max;
     trendLabels.push(EXAM_LABEL[k]||k);
-    trendData.push(Math.round(ok/ex.total*100));
+    trendData.push(cs.pct);
   });
   var pct = totalQ>0?Math.round(totalRight/totalQ*100):0;
   var lv  = getLvInfo(pct);
@@ -5531,8 +5681,7 @@ function runPersonalAnalysis(){
     DB.students.forEach(function(st){
       var sc=DB.scores[st.id] && DB.scores[st.id][k];
       if(sc && sc.length){
-        var ok=sc.filter(Boolean).length;
-        sum += Math.round(ok/ex.total*100); cnt++;
+        sum += calcExamScore(sc,ex).pct; cnt++;
       }
     });
     return cnt>0?Math.round(sum/cnt):null;
@@ -5574,7 +5723,7 @@ function runPersonalAnalysis(){
       var m=q.major||q.unit||'기타';
       if(!majorMap[m]) majorMap[m]={ok:0,tot:0};
       majorMap[m].tot++;
-      if(!isItemWrong(ans,i,q)) majorMap[m2].ok++;
+      if(!isItemWrong(ans,i,q)) majorMap[m].ok++;
     });
   });
   var uLabels=Object.keys(majorMap).slice(0,10);
@@ -6361,9 +6510,9 @@ function printPersonalInNewWindow(sid, examKeys, chartImages, returnHtmlOnly){
   var trendRows=[];
   keys.forEach(function(k){
     var ex=DB.exams[k], ans=allScores[k];
-    var ok=calcExamScore(ans,ex).got;
-    totalRight+=ok; totalQ+=ex.total;
-    trendRows.push({label:EXAM_LABEL[k]||k, ok:ok, tot:ex.total, pct:Math.round(ok/ex.total*100)});
+    var cs=calcExamScore(ans,ex);
+    totalRight+=cs.got; totalQ+=cs.max;
+    trendRows.push({label:EXAM_LABEL[k]||k, ok:cs.got, tot:cs.max, pct:cs.pct});
   });
   var pct = totalQ>0?Math.round(totalRight/totalQ*100):0;
   var lv  = getLvInfo(pct);
