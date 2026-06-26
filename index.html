@@ -3838,8 +3838,8 @@ function renderStudents(){
       +phoneTag
       +(trendHtml?'<span class="badge b-pr" style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;">최근 '+trendHtml+'</span>':'')
       +'<div style="margin-left:auto;display:flex;gap:4px;">'
-      +'<button class="btn btn-mu btn-xs std-edit-btn" data-sid="'+s.id+'" onclick="event.stopPropagation();">✏️ 수정</button>'
-      +'<button class="btn btn-ng btn-xs std-del-btn" data-sid="'+s.id+'" onclick="event.stopPropagation();">🗑️</button>'
+      +'<button class="btn btn-mu btn-xs std-edit-btn" data-sid="'+s.id+'" onclick="event.stopPropagation();openStudentModal(\''+s.id+'\');">✏️ 수정</button>'
+      +'<button class="btn btn-ng btn-xs std-del-btn" data-sid="'+s.id+'" onclick="event.stopPropagation();doDeleteStudent(\''+s.id+'\');">🗑️</button>'
       +'</div></div></div></div></div>';
   }
 
