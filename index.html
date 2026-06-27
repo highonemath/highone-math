@@ -3856,12 +3856,14 @@ function renderStudents(){
   var headLabel = (teacherFilter==='__none__') ? '❓ 담당 미지정' : ('👨‍🏫 '+escHtml(teacherFilter)+' 선생님');
   var headBg = (teacherFilter==='__none__') ? '#94a3b8' : 'linear-gradient(135deg,#1a3a6b,#2557a7)';
 
-  // 표시된 학생들의 학년에서 가능한 시험그룹 모으기 (중복 제거, GRADE_LIST 순서)
+  // 표시된 학생들의 학년 수집 → GRADE_LIST 순서(저학년→고학년)대로 시험그룹 옵션 구성
+  var presentGrades = {};
+  students.forEach(function(s){ var gk=GRADE_KEY_MAP[s.grade]; if(gk) presentGrades[gk]=true; });
   var groupSeen = {}, groupOpts = [];
-  students.forEach(function(s){
-    var grps = getGroupsForGrade(GRADE_KEY_MAP[s.grade]);
-    grps.forEach(function(g){
-      if(!groupSeen[g.gkey]){ groupSeen[g.gkey]=true; groupOpts.push({gkey:g.gkey, glabel:g.glabel}); }
+  GRADE_LIST.forEach(function(g){
+    if(!presentGrades[g.key]) return;          // 현재 표시된 학년만
+    (g.groups||[]).forEach(function(grp){        // 그 학년의 시험그룹들 (학기 순서대로)
+      if(!groupSeen[grp.gkey]){ groupSeen[grp.gkey]=true; groupOpts.push({gkey:grp.gkey, glabel:grp.glabel}); }
     });
   });
   // 선택값이 현재 목록에 없으면 auto로 초기화
