@@ -3670,6 +3670,7 @@ function renderAttendanceStatsSection(){
 
 // === 학생 선택(체크박스) 관리 ===
 var _selectedStudents = {}; // {studentId: true}
+var _cardExamGroup = 'auto'; // 학생카드 응시현황 표시 기준 시험그룹 gkey ('auto'=자동선택)
 
 function toggleStudentSelect(id){
   if(_selectedStudents[id]) delete _selectedStudents[id];
@@ -3816,9 +3817,17 @@ function renderStudents(){
     var trend = getScoreTrend(s.id);
     var trendHtml = trend ? scoreTrendBadge(trend) : '';
     var phoneTag = s.parentPhone ? '<span style="font-size:10px;color:var(--ok);" title="리포트 암호: '+s.parentPhone.slice(-4)+'">🔒'+s.parentPhone.slice(-4)+'</span>' : '';
-    // 응시현황 dot (학생의 학년에서 응시 기록이 가장 많은 시험그룹 1개를 대표로 표시)
+    // 응시현황 dot (선택된 시험그룹 기준, 'auto'면 응시 기록이 가장 많은 그룹 자동선택)
     var attendDots = '';
-    var mainGroup = pickMainGroupForStudent(s.id, GRADE_KEY_MAP[s.grade]);
+    var mainGroup = null;
+    if(_cardExamGroup && _cardExamGroup!=='auto'){
+      // 선택된 시험그룹 — 학생 학년의 그룹 중 gkey가 일치하는 것
+      var grps = getGroupsForGrade(GRADE_KEY_MAP[s.grade]);
+      mainGroup = grps.find(function(g){return g.gkey===_cardExamGroup;}) || null;
+    }
+    if(!mainGroup){
+      mainGroup = pickMainGroupForStudent(s.id, GRADE_KEY_MAP[s.grade]);
+    }
     if(mainGroup){
       attendDots = '<div style="display:flex;align-items:center;gap:5px;margin-top:6px;">'
         +'<span style="font-size:9px;color:var(--mu);white-space:nowrap;">'+escHtml(mainGroup.glabel)+'</span>'
@@ -3846,10 +3855,33 @@ function renderStudents(){
   // 선택된 선생님 헤더
   var headLabel = (teacherFilter==='__none__') ? '❓ 담당 미지정' : ('👨‍🏫 '+escHtml(teacherFilter)+' 선생님');
   var headBg = (teacherFilter==='__none__') ? '#94a3b8' : 'linear-gradient(135deg,#1a3a6b,#2557a7)';
+
+  // 표시된 학생들의 학년에서 가능한 시험그룹 모으기 (중복 제거, GRADE_LIST 순서)
+  var groupSeen = {}, groupOpts = [];
+  students.forEach(function(s){
+    var grps = getGroupsForGrade(GRADE_KEY_MAP[s.grade]);
+    grps.forEach(function(g){
+      if(!groupSeen[g.gkey]){ groupSeen[g.gkey]=true; groupOpts.push({gkey:g.gkey, glabel:g.glabel}); }
+    });
+  });
+  // 선택값이 현재 목록에 없으면 auto로 초기화
+  if(_cardExamGroup!=='auto' && !groupSeen[_cardExamGroup]) _cardExamGroup='auto';
+  var examSelHtml = '';
+  if(groupOpts.length){
+    examSelHtml = '<select id="cardExamGroupSel" onchange="onCardExamGroupChange()" '
+      +'style="margin-left:auto;font-size:11px;padding:4px 8px;border-radius:6px;border:none;background:rgba(255,255,255,.92);color:#1a3a6b;font-weight:700;cursor:pointer;max-width:200px;">'
+      +'<option value="auto"'+(_cardExamGroup==='auto'?' selected':'')+'>📋 응시현황 (자동)</option>';
+    groupOpts.forEach(function(o){
+      examSelHtml += '<option value="'+escHtml(o.gkey)+'"'+(_cardExamGroup===o.gkey?' selected':'')+'>'+escHtml(o.glabel)+'</option>';
+    });
+    examSelHtml += '</select>';
+  }
+
   var gridHtml = '<div style="grid-column:1/-1;margin-bottom:4px;">'
     +'<div style="display:flex;align-items:center;gap:8px;padding:9px 14px;background:'+headBg+';border-radius:8px;color:#fff;">'
     +'<span style="font-size:14px;font-weight:800;">'+headLabel+'</span>'
     +'<span style="font-size:12px;opacity:.85;">'+students.length+'명</span>'
+    +examSelHtml
     +'</div></div>';
 
   if(gradeFilter){
@@ -3911,6 +3943,13 @@ function renderStudents(){
     var card = e.target.closest('.std-card');
     if(card) openStudentAttendanceModal(card.getAttribute('data-sid'));
   };
+}
+
+// 학생카드 응시현황 시험그룹 드롭다운 변경 → 카드만 다시 렌더
+function onCardExamGroupChange(){
+  var sel = document.getElementById('cardExamGroupSel');
+  if(sel){ _cardExamGroup = sel.value; }
+  renderStudents();
 }
 
 function initGradeFilter(){
