@@ -2087,6 +2087,12 @@ var EXAM_LABEL = {
   '중2-1기-4회': '중2 1학기 기말 4회',
   '중2-1기-5회': '중2 1학기 기말 5회',
   '중2-1기-6회': '중2 1학기 기말 6회',
+  '중2-2중-1회': '중2 2학기 중간 1회',
+  '중2-2중-2회': '중2 2학기 중간 2회',
+  '중2-2중-3회': '중2 2학기 중간 3회',
+  '중2-2중-4회': '중2 2학기 중간 4회',
+  '중2-2중-5회': '중2 2학기 중간 5회',
+  '중2-2중-6회': '중2 2학기 중간 6회',
   '중3-1기-1회': '중3 1학기 기말 1회',
   '중3-1기-2회': '중3 1학기 기말 2회',
   '중3-1기-3회': '중3 1학기 기말 3회',
@@ -2214,8 +2220,12 @@ function scoreTrendBadge(trend, opts){
 // ============================================================
 // 문항 만점 반환 (서술형+배점 있으면 q.points, 그 외 1)
 function getItemMaxScore(q){
-  if((q.type||'')==='서술형' && q.points && q.points>1) return q.points;
-  return 1;
+  // 모든 문항이 배점을 만점으로 사용 (객관식=전부 맞거나 0, 서술형=부분점수 가능)
+  // 배점 필드명은 시험지에 따라 points 또는 score 두 가지가 혼용됨
+  if(!q) return 1;
+  var p = (q.points!=null ? q.points : q.score);
+  if(p && p > 0) return p;
+  return 1; // 배점 미등록 문항은 1점 처리 (구 데이터 호환)
 }
 // 저장된 답안에서 문항 취득점 반환 (boolean 하위호환)
 function getItemScore(ans, i, q){
@@ -2286,6 +2296,8 @@ function loadDB(){
     '고2-대수-2-6회',
     '중2-1기-1회','중2-1기-2회','중2-1기-3회',
     '중2-1기-4회','중2-1기-5회','중2-1기-6회',
+    '중2-2중-1회','중2-2중-2회','중2-2중-3회',
+    '중2-2중-4회','중2-2중-5회','중2-2중-6회',
     '중3-1기-1회','중3-1기-2회','중3-1기-3회',
     '중3-1기-4회','중3-1기-5회','중3-1기-6회',
     '고1-공수1-1기-1회',
@@ -2545,6 +2557,189 @@ function loadDB(){
     };
   }
 
+
+  // =================================================
+  // === 중2-2학기 중간고사 1~6회 시험지 데이터 ===
+  // =================================================
+
+  // ─── 1회 (19문항 / 이등변삼각형과 직각삼각형 ~ 여러 가지 사각형) ───
+  if(!DB.exams['중2-2중-1회'] || DB.exams['중2-2중-1회'].total !== 19 || (DB.exams['중2-2중-1회'].questions && DB.exams['중2-2중-1회'].questions[0] && DB.exams['중2-2중-1회'].questions[0].comment.indexOf('∠A의 이등분선과 BC의 교점 D') === -1)){
+    DB.exams['중2-2중-1회'] = {
+      total: 19,
+      questions: [
+        {num:1,  points:3, major:"이등변삼각형과 직각삼각형", unit:"이등변삼각형의 성질",   type:"객관식", diff:"하", comment:"AB=AC 이등변삼각형에서 ∠A의 이등분선과 BC의 교점 D, ∠A=50° 일 때 ∠B 구하기"},
+        {num:2,  points:3, major:"이등변삼각형과 직각삼각형", unit:"직각삼각형의 합동",     type:"객관식", diff:"하", comment:"∠C=∠F=90° 두 직각삼각형의 합동(RHA) 이용해 EF 길이 구하기"},
+        {num:3,  points:5, major:"이등변삼각형과 직각삼각형", unit:"직각삼각형의 합동",     type:"객관식", diff:"하", comment:"AC=AD, AB⊥DE 조건에서 RHS합동 이용해 △BED 둘레 구하기"},
+        {num:4,  points:4, major:"이등변삼각형과 직각삼각형", unit:"이등변삼각형의 성질",   type:"객관식", diff:"하", comment:"AB=BC 이등변삼각형에서 ∠C 이등분선과 AB 교점 D – ∠ADC 구하기"},
+        {num:5,  points:4, major:"이등변삼각형과 직각삼각형", unit:"직각삼각형의 합동",     type:"객관식", diff:"하", comment:"직각이등변삼각형에서 수선의 발 D,E – BD=5, CE=3일 때 △ABC 넓이"},
+        {num:6,  points:4, major:"삼각형의 외심과 내심",     unit:"삼각형의 외심",         type:"객관식", diff:"하", comment:"외심 O에서 ∠AOB=2∠C 성질 이용해 ∠AOB 구하기"},
+        {num:7,  points:4, major:"삼각형의 외심과 내심",     unit:"삼각형의 내심",         type:"객관식", diff:"하", comment:"내심 I에서 ∠C=2×20° 이용, BI가 ∠B 이등분선일 때 ∠BIE 구하기"},
+        {num:8,  points:4, major:"삼각형의 외심과 내심",     unit:"삼각형의 외심",         type:"객관식", diff:"하", comment:"∠AOB:∠BOC:∠COA=4:5:6일 때 ∠OBC 구하기"},
+        {num:9,  points:4, major:"삼각형의 외심과 내심",     unit:"삼각형의 내심",         type:"객관식", diff:"하", comment:"내심 I에 대한 설명 중 옳은 것 판별 (△AIF≡△AID)"},
+        {num:10, points:4, major:"평행사변형",               unit:"평행사변형의 성질",     type:"객관식", diff:"하", comment:"AD=8, AC+BD=23일 때 △AOD 둘레의 길이 구하기"},
+        {num:11, points:4, major:"평행사변형",               unit:"평행사변형의 성질",     type:"객관식", diff:"하", comment:"∠B 이등분선과 CD 연장선 교점 E – FD+DE 값 구하기"},
+        {num:12, points:4, major:"여러 가지 사각형",         unit:"직사각형과 마름모",     type:"객관식", diff:"중", comment:"마름모 ABCD의 대각선 성질 중 옳지 않은 것 (AC=BD 아님)"},
+        {num:13, points:4, major:"평행사변형",               unit:"평행사변형이 되는 조건", type:"객관식", diff:"하", comment:"□ABCD가 평행사변형이 되는 조건 판별 (두 쌍의 대각 크기 같음)"},
+        {num:14, points:4, major:"평행사변형",               unit:"평행사변형의 성질",     type:"객관식", diff:"중", comment:"∠OAB=∠OBA일 때 옳은 것 판별 (OB=OC)"},
+        {num:15, points:5, major:"여러 가지 사각형",         unit:"정사각형과 등변사다리꼴", type:"객관식", diff:"중", comment:"정사각형에서 대각선 BD 위 점 E, ∠DAF=25°일 때 ∠CEF 구하기"},
+        {num:16, points:8, major:"이등변삼각형과 직각삼각형", unit:"이등변삼각형의 성질",   type:"서술형", diff:"중", comment:"[서술형1] ∠B,∠C 이등분선 교점 D – ∠DBC=∠DCB 설명 및 △DBC 판별"},
+        {num:17, points:12, major:"삼각형의 외심과 내심",    unit:"삼각형의 외심",         type:"서술형", diff:"중", comment:"[서술형2] 외심 O·내심 I, ∠A=40° – △OAB 합동 설명, ∠OBA·∠IBA·∠x 구하기"},
+        {num:18, points:10, major:"평행사변형",              unit:"평행사변형이 되는 조건", type:"서술형", diff:"중", comment:"[서술형3] OA=OC, OB=OD – △OAB·△OBC 합동 설명 및 사각형 판별"},
+        {num:19, points:10, major:"여러 가지 사각형",        unit:"정사각형과 등변사다리꼴", type:"서술형", diff:"중", comment:"[서술형4] 등변사다리꼴 AD=CD, ∠ACB=35° – 합동 삼각형·∠ACD·∠BDC 구하기"}
+      ]
+    };
+  }
+
+  // ─── 2회 (19문항 / 이등변삼각형과 직각삼각형 ~ 여러 가지 사각형) ───
+  if(!DB.exams['중2-2중-2회'] || DB.exams['중2-2중-2회'].total !== 19 || (DB.exams['중2-2중-2회'].questions && DB.exams['중2-2중-2회'].questions[0] && DB.exams['중2-2중-2회'].questions[0].comment.indexOf('∠A의 외각의 크기는 78°') === -1)){
+    DB.exams['중2-2중-2회'] = {
+      total: 19,
+      questions: [
+        {num:1,  points:3.2, major:"이등변삼각형과 직각삼각형", unit:"이등변삼각형의 성질",   type:"객관식", diff:"하", comment:"△ABD에서 ∠A의 외각의 크기는 78°, AB=BC, AC=CD일 때 ∠x 구하기"},
+        {num:2,  points:3.3, major:"여러 가지 사각형",         unit:"직사각형과 마름모",     type:"객관식", diff:"하", comment:"마름모에서 AC=8, BD=12일 때 △ABO의 넓이 구하기"},
+        {num:3,  points:3.4, major:"삼각형의 외심과 내심",     unit:"삼각형의 내심",         type:"객관식", diff:"하", comment:"외심·내심의 정의와 성질 중 옳지 않은 것 판별"},
+        {num:4,  points:3.5, major:"여러 가지 사각형",         unit:"직사각형과 마름모",     type:"객관식", diff:"하", comment:"직사각형 AC=14cm에 대한 설명 중 옳지 않은 것 (∠BAC=45° 아님)"},
+        {num:5,  points:3.5, major:"삼각형의 외심과 내심",     unit:"삼각형의 내심",         type:"객관식", diff:"하", comment:"내심 I, 둘레 32cm·넓이 48cm²일 때 내접원의 넓이 구하기"},
+        {num:6,  points:3.6, major:"이등변삼각형과 직각삼각형", unit:"직각삼각형의 합동",     type:"객관식", diff:"하", comment:"PQ=PR일 때 △POQ≡△POR의 합동 조건(RHS) 판별"},
+        {num:7,  points:3.7, major:"이등변삼각형과 직각삼각형", unit:"직각삼각형의 합동",     type:"객관식", diff:"하", comment:"RHA합동 설명 과정 (가)~(마) 빈칸 중 옳지 않은 것 판별"},
+        {num:8,  points:3.8, major:"여러 가지 사각형",         unit:"정사각형과 등변사다리꼴", type:"객관식", diff:"중", comment:"사다리꼴 OA:OC=2:3, △AOD=48일 때 사다리꼴 전체 넓이 구하기"},
+        {num:9,  points:3.9, major:"이등변삼각형과 직각삼각형", unit:"이등변삼각형의 성질",   type:"객관식", diff:"중", comment:"∠A 이등분선 위 점 P – 옳지 않은 것 판별 (BP는 ∠ABD 이등분선 아님)"},
+        {num:10, points:4, major:"여러 가지 사각형",         unit:"여러 가지 사각형의 관계", type:"객관식", diff:"중", comment:"<보기> (가)~(사) 중 사각형의 포함 관계에서 옳은 것의 개수"},
+        {num:11, points:4.1, major:"삼각형의 외심과 내심",     unit:"삼각형의 내심",         type:"객관식", diff:"중", comment:"두 내심 I, I′ – CI와 AI′의 연장선 교점 O에서 ∠IOI′ 구하기"},
+        {num:12, points:5, major:"이등변삼각형과 직각삼각형", unit:"이등변삼각형의 성질",   type:"서술형", diff:"하", comment:"[서술형1] 종이테이프 접기 – △ABC의 종류와 ∠x 구하기"},
+        {num:13, points:5, major:"삼각형의 외심과 내심",     unit:"삼각형의 외심",         type:"서술형", diff:"하", comment:"[서술형2] 외심 O, BC=12·OE=2·넓이 50일 때 사각형 ADOF 넓이 구하기"},
+        {num:14, points:5, major:"삼각형의 외심과 내심",     unit:"삼각형의 내심",         type:"서술형", diff:"중", comment:"[서술형3] 내심 I, ∠BDC=70°·∠BEC=83°일 때 ∠A 구하기"},
+        {num:15, points:5, major:"여러 가지 사각형",         unit:"정사각형과 등변사다리꼴", type:"서술형", diff:"중", comment:"[서술형4] AC⊥BD 등변사다리꼴, BH=8일 때 넓이 구하기"},
+        {num:16, points:10, major:"이등변삼각형과 직각삼각형", unit:"이등변삼각형의 성질",  type:"서술형", diff:"하", comment:"[서술형5] 중점 D,E – △DBC≡△ECB, △ABE≡△ACD 합동 이유와 조건 서술"},
+        {num:17, points:10, major:"삼각형의 외심과 내심",    unit:"삼각형의 외심",         type:"서술형", diff:"중", comment:"[서술형6] ∠B=55°·∠C=84°, 외심 O·내심 I에서 ∠x, ∠y, ∠z 구하기"},
+        {num:18, points:10, major:"평행사변형",              unit:"평행사변형이 되는 조건", type:"서술형", diff:"중", comment:"[서술형7] 평행사변형이 되는 조건 (나)(마) 증명 및 (다)(라) 빈칸 채우기"},
+        {num:19, points:10, major:"평행사변형",              unit:"평행사변형이 되는 조건", type:"서술형", diff:"상", comment:"[서술형8] 세 정삼각형 – □FADE가 평행사변형임을 증명하고 둘레 구하기"}
+      ]
+    };
+  }
+
+  // ─── 3회 (18문항 / 이등변삼각형과 직각삼각형 ~ 여러가지 사각형) ───
+  if(!DB.exams['중2-2중-3회'] || DB.exams['중2-2중-3회'].total !== 18 || (DB.exams['중2-2중-3회'].questions && DB.exams['중2-2중-3회'].questions[0] && DB.exams['중2-2중-3회'].questions[0].comment.indexOf('두 밑각의 크기가 같음을 설명') === -1)){
+    DB.exams['중2-2중-3회'] = {
+      total: 18,
+      questions: [
+        {num:1,  points:4, major:"이등변삼각형과 직각삼각형", unit:"이등변삼각형의 성질",   type:"객관식", diff:"하", comment:"이등변삼각형의 두 밑각의 크기가 같음을 설명하는 과정 – ①~⑤ 중 옳지 않은 것(RHA)"},
+        {num:2,  points:4, major:"이등변삼각형과 직각삼각형", unit:"이등변삼각형의 성질",   type:"객관식", diff:"하", comment:"직사각형 종이 접기 – FG=5, EG=4일 때 △EFG의 둘레 구하기"},
+        {num:3,  points:5, major:"이등변삼각형과 직각삼각형", unit:"이등변삼각형의 성질",   type:"객관식", diff:"하", comment:"AB=AC, BC=CD=DA일 때 ∠A의 크기 구하기"},
+        {num:4,  points:5, major:"삼각형의 외심과 내심",     unit:"삼각형의 외심",         type:"객관식", diff:"하", comment:"외심 O, 둘레 42cm일 때 2x-y+z의 값 구하기"},
+        {num:5,  points:5, major:"삼각형의 외심과 내심",     unit:"삼각형의 외심",         type:"객관식", diff:"하", comment:"AB=11cm, △OAB 둘레 27cm일 때 외접원 반지름 구하기"},
+        {num:6,  points:5, major:"삼각형의 외심과 내심",     unit:"삼각형의 내심",         type:"객관식", diff:"중", comment:"내심 I와 접점 D,E,F – EC의 길이 구하기"},
+        {num:7,  points:6, major:"삼각형의 외심과 내심",     unit:"삼각형의 내심",         type:"객관식", diff:"중", comment:"외심 O와 △ACD의 내심 I – ∠OAI의 크기 구하기"},
+        {num:8,  points:6, major:"삼각형의 외심과 내심",     unit:"삼각형의 내심",         type:"객관식", diff:"중", comment:"직각삼각형의 내심 I – △IAC의 넓이 구하기"},
+        {num:9,  points:4, major:"평행사변형",               unit:"평행사변형의 성질",     type:"객관식", diff:"하", comment:"평행사변형 대변 길이 조건에서 x+y의 값 구하기"},
+        {num:10, points:5, major:"평행사변형",               unit:"평행사변형의 성질",     type:"객관식", diff:"중", comment:"CD=DE 조건, ∠AEO=∠OED=20°일 때 ∠OAB 구하기"},
+        {num:11, points:5, major:"평행사변형",               unit:"평행사변형의 성질",     type:"객관식", diff:"중", comment:"EC=FC=DC, ∠AEC=98°일 때 ∠EFD의 크기 구하기"},
+        {num:12, points:4, major:"여러 가지 사각형",         unit:"직사각형과 마름모",     type:"객관식", diff:"하", comment:"마름모에서 두 대각선의 교점 O – x+y의 값 구하기"},
+        {num:13, points:5, major:"여러 가지 사각형",         unit:"여러 가지 사각형의 관계", type:"객관식", diff:"하", comment:"<보기> ㄱ~ㄷ 중 사각형에 대한 설명으로 옳은 것 고르기"},
+        {num:14, points:5, major:"여러 가지 사각형",         unit:"정사각형과 등변사다리꼴", type:"객관식", diff:"중", comment:"정사각형에서 AD=AE, ∠EDA=79°일 때 ∠ABF 구하기"},
+        {num:15, points:6, major:"여러 가지 사각형",         unit:"직사각형과 마름모",     type:"객관식", diff:"중", comment:"마름모 AB:AO=2:1, AE=BE, △ABE=18일 때 마름모의 넓이"},
+        {num:16, points:6, major:"여러 가지 사각형",         unit:"직사각형과 마름모",     type:"객관식", diff:"중", comment:"CE:DE=2:1, △DFE=1일 때 평행사변형 ABCD의 넓이 구하기"},
+        {num:17, points:10, major:"이등변삼각형과 직각삼각형", unit:"직각삼각형의 합동",    type:"서술형", diff:"하", comment:"[서술형1] ∠A 이등분선·DE⊥AB – 합동 직각삼각형 찾기, DE 길이, △ABD 넓이"},
+        {num:18, points:10, major:"평행사변형",              unit:"평행사변형의 성질",     type:"서술형", diff:"중", comment:"[서술형2] 대각선 교점 O를 지나는 직선 – PO=QO 증명 과정 및 넓이 구하기"}
+      ]
+    };
+  }
+
+  // ─── 4회 (20문항 / 이등변삼각형과 직각삼각형 ~ 여러가지사각형) ───
+  if(!DB.exams['중2-2중-4회'] || DB.exams['중2-2중-4회'].total !== 20 || (DB.exams['중2-2중-4회'].questions && DB.exams['중2-2중-4회'].questions[0] && DB.exams['중2-2중-4회'].questions[0].comment.indexOf('∠ABC의 크기는') === -1)){
+    DB.exams['중2-2중-4회'] = {
+      total: 20,
+      questions: [
+        {num:1,  points:3, major:"이등변삼각형과 직각삼각형", unit:"이등변삼각형의 성질",   type:"객관식", diff:"하", comment:"AB=AC 이등변삼각형에서 ∠A=110°일 때 ∠ABC의 크기는?"},
+        {num:2,  points:3, major:"삼각형의 외심과 내심",     unit:"삼각형의 내심",         type:"객관식", diff:"하", comment:"내심 I에서 각 변에 내린 수선의 발 D,E,F – 옳은 것 판별 (ID=IE=IF)"},
+        {num:3,  points:3, major:"삼각형의 외심과 내심",     unit:"삼각형의 외심",         type:"객관식", diff:"하", comment:"외심 O, ∠OBA=35°·∠OCA=20°일 때 ∠OBC 구하기"},
+        {num:4,  points:3, major:"이등변삼각형과 직각삼각형", unit:"직각삼각형의 합동",     type:"객관식", diff:"하", comment:"두 직각삼각형이 합동이 되는 조건이 아닌 것 판별 (세 각 같음)"},
+        {num:5,  points:3, major:"평행사변형",               unit:"평행사변형의 성질",     type:"객관식", diff:"하", comment:"평행사변형에서 ∠DBC=30°·∠BDC=50°일 때 x+y의 값"},
+        {num:6,  points:3, major:"여러 가지 사각형",         unit:"직사각형과 마름모",     type:"객관식", diff:"하", comment:"직사각형에서 대각선 길이가 같음을 이용해 CD의 길이 구하기"},
+        {num:7,  points:3, major:"여러 가지 사각형",         unit:"여러 가지 사각형의 관계", type:"객관식", diff:"하", comment:"사각형에 대한 설명 중 옳지 않은 것 (대각선 길이 같은 평행사변형은 직사각형)"},
+        {num:8,  points:4, major:"이등변삼각형과 직각삼각형", unit:"이등변삼각형의 성질",   type:"객관식", diff:"중", comment:"AB=AC=CD, ∠DCE=60°일 때 ∠x의 크기 구하기"},
+        {num:9,  points:4, major:"평행사변형",               unit:"평행사변형의 성질",     type:"객관식", diff:"중", comment:"두 평행사변형 ABCD·ABEF – ∠BAD=112°, ∠DBC=25°일 때 ∠FED"},
+        {num:10, points:4, major:"평행사변형",               unit:"평행사변형의 성질",     type:"객관식", diff:"하", comment:"AD=4cm, AC+BD=15cm일 때 △OBC의 둘레 구하기"},
+        {num:11, points:4, major:"평행사변형",               unit:"평행사변형이 되는 조건", type:"객관식", diff:"하", comment:"<보기> ㄱ~ㄹ 중 평행사변형이 되는 것 고르기"},
+        {num:12, points:4, major:"평행사변형",               unit:"평행사변형의 성질",     type:"객관식", diff:"중", comment:"∠D 이등분선과 AB 연장선 교점 E – BF=2, CD=5일 때 x+y"},
+        {num:13, points:4, major:"여러 가지 사각형",         unit:"정사각형과 등변사다리꼴", type:"객관식", diff:"중", comment:"합동인 두 정사각형 – □OPCQ 넓이 16일 때 EF의 길이"},
+        {num:14, points:5, major:"삼각형의 외심과 내심",     unit:"삼각형의 내심",         type:"객관식", diff:"중", comment:"내심 I – ∠x+∠y=210°일 때 ∠C의 크기 구하기"},
+        {num:15, points:5, major:"삼각형의 외심과 내심",     unit:"삼각형의 내심",         type:"객관식", diff:"중", comment:"내접원 4π·외접원 25π일 때 직각삼각형 ABC의 넓이 구하기"},
+        {num:16, points:5, major:"삼각형의 외심과 내심",     unit:"삼각형의 외심",         type:"객관식", diff:"중", comment:"내심 I·외심 O가 AD 위, ∠A=80°일 때 ∠IEO의 크기"},
+        {num:17, points:10, major:"여러 가지 사각형",        unit:"직사각형과 마름모",     type:"서술형", diff:"중", comment:"[서술형1] □EBFD가 마름모일 때 ∠BFD의 크기를 구하고 과정 서술"},
+        {num:18, points:10, major:"여러 가지 사각형",        unit:"여러 가지 사각형의 관계", type:"서술형", diff:"중", comment:"[서술형2] BF:FC=2:5, △EBF=5일 때 □AEFD의 넓이 구하고 과정 서술"},
+        {num:19, points:10, major:"이등변삼각형과 직각삼각형", unit:"이등변삼각형의 성질",  type:"서술형", diff:"중", comment:"[서술형3] AB=6·넓이 24일 때 PD+PE의 값을 구하고 과정 서술"},
+        {num:20, points:10, major:"평행사변형",              unit:"평행사변형이 되는 조건", type:"서술형", diff:"중", comment:"[서술형4] 세 정삼각형 – □PARQ가 평행사변형임을 설명하고 ∠PQR 구하기"}
+      ]
+    };
+  }
+
+  // ─── 5회 (24문항 / 이등변삼각형과직각삼각형 ~ 피타고라스정리) ───
+  if(!DB.exams['중2-2중-5회'] || DB.exams['중2-2중-5회'].total !== 24 || (DB.exams['중2-2중-5회'].questions && DB.exams['중2-2중-5회'].questions[0] && DB.exams['중2-2중-5회'].questions[0].comment.indexOf('세 이등변삼각형에서 ∠x') === -1)){
+    DB.exams['중2-2중-5회'] = {
+      total: 24,
+      questions: [
+        {num:1,  points:3, major:"이등변삼각형과 직각삼각형", unit:"이등변삼각형의 성질",   type:"객관식", diff:"하", comment:"△ABC≡△ACD≡△ADE인 세 이등변삼각형에서 ∠x의 크기 구하기"},
+        {num:2,  points:3.5, major:"피타고라스 정리",           unit:"피타고라스 정리",       type:"객관식", diff:"하", comment:"세 변 7,5,a인 삼각형이 직각삼각형이 되기 위한 a²의 값 모두 구하기"},
+        {num:3,  points:3.5, major:"평행사변형",               unit:"평행사변형이 되는 조건", type:"객관식", diff:"중", comment:"□ABCD가 평행사변형이 되는 조건이 아닌 것 판별"},
+        {num:4,  points:3.5, major:"여러 가지 사각형",         unit:"여러 가지 사각형의 관계", type:"객관식", diff:"하", comment:"'두 대각선이 서로 다른 것을 이등분한다'와 관계없는 도형 (등변사다리꼴)"},
+        {num:5,  points:3.5, major:"평행사변형",               unit:"평행사변형의 성질",     type:"객관식", diff:"하", comment:"대각선 교점 O를 지나는 직선과 AD·BC의 교점 P,Q – 옳은 것 판별"},
+        {num:6,  points:3.5, major:"여러 가지 사각형",         unit:"여러 가지 사각형의 관계", type:"객관식", diff:"중", comment:"l∥m, AE∥DC일 때 □ABED의 넓이를 a,b,c로 나타내기"},
+        {num:7,  points:4, major:"도형의 닮음",              unit:"삼각형의 닮음조건",     type:"객관식", diff:"중", comment:"AD=12, DB=4, BC=8, DC=6일 때 옳지 않은 것 판별 (SAS닮음)"},
+        {num:8,  points:4, major:"도형의 닮음",              unit:"삼각형의 닮음조건",     type:"객관식", diff:"중", comment:"AC⊥BF, AE⊥BD, DE⊥BF일 때 △CAB와 닮음이 아닌 삼각형 찾기"},
+        {num:9,  points:4, major:"이등변삼각형과 직각삼각형", unit:"직각삼각형의 합동",     type:"객관식", diff:"상", comment:"직각이등변삼각형 ACE – ED=10, □ABDE=162일 때 △ACE 넓이"},
+        {num:10, points:4, major:"삼각형의 외심과 내심",     unit:"삼각형의 외심",         type:"객관식", diff:"중", comment:"외심 O, ∠A=64°일 때 ∠OBC의 크기 구하기"},
+        {num:11, points:4, major:"삼각형의 외심과 내심",     unit:"삼각형의 내심",         type:"객관식", diff:"중", comment:"내심 I, ∠C=78°일 때 ∠ADB+∠AEB의 값 구하기"},
+        {num:12, points:4, major:"닮음의 활용",              unit:"닮음의 활용",           type:"객관식", diff:"중", comment:"CE=BD 증명 과정 (가)~(마) 중 옳지 않은 것 판별 (RHS합동)"},
+        {num:13, points:4, major:"평행사변형",               unit:"평행사변형이 되는 조건", type:"객관식", diff:"중", comment:"∠ABF=∠CBF, ∠AFB=52°일 때 평행사변형이 되도록 하는 ∠C"},
+        {num:14, points:4, major:"여러 가지 사각형",         unit:"정사각형과 등변사다리꼴", type:"객관식", diff:"중", comment:"정사각형 BD 위 점 E, ∠AED=106°일 때 ∠x의 크기"},
+        {num:15, points:4, major:"피타고라스 정리",           unit:"피타고라스 정리",       type:"객관식", diff:"중", comment:"마름모 AC=10cm·넓이 120cm²일 때 BD+AB의 길이"},
+        {num:16, points:4, major:"평행사변형",               unit:"평행사변형의 성질",     type:"객관식", diff:"중", comment:"∠D 이등분선과 BC 교점 E, AH⊥CD일 때 ∠x의 크기"},
+        {num:17, points:4, major:"도형의 닮음",              unit:"삼각형의 닮음조건",     type:"객관식", diff:"중", comment:"BF 연장선과 CD 연장선의 교점 E – DF의 길이 구하기 (AA닮음)"},
+        {num:18, points:4, major:"피타고라스 정리",           unit:"피타고라스 정리",       type:"객관식", diff:"중", comment:"반지름 15cm 외접원, AD⊥BC·DH⊥AO, BD=6일 때 DH와 AH의 차"},
+        {num:19, points:4.5, major:"이등변삼각형과 직각삼각형", unit:"직각삼각형의 합동",     type:"객관식", diff:"중", comment:"AB=10, AC=6, ∠BAC 이등분선과 BC 교점 D – AD²의 값"},
+        {num:20, points:4.5, major:"여러 가지 사각형",         unit:"직사각형과 마름모",     type:"객관식", diff:"상", comment:"마름모 BE=BF, BE=a·BC=b·AO=c일 때 △AOD의 넓이"},
+        {num:21, points:4.5, major:"닮음의 활용",              unit:"닮음의 활용",           type:"객관식", diff:"상", comment:"시에르핀스키 삼각형 – 1~3단계에서 지워지는 정삼각형 넓이의 합"},
+        {num:22, points:6, major:"삼각형의 외심과 내심",     unit:"삼각형의 외심",         type:"서술형", diff:"중", comment:"[서술형1] 외심 O·내심 I, ∠ACO=21°일 때 ∠ICB와 ∠OBI 구하기"},
+        {num:23, points:6, major:"평행사변형",               unit:"평행사변형의 성질",     type:"서술형", diff:"상", comment:"[서술형2] ∠A·∠D 이등분선이 BC와 만나는 점 E,F – AB의 길이 구하기"},
+        {num:24, points:6, major:"닮음의 활용",              unit:"닮음의 활용",           type:"서술형", diff:"상", comment:"[서술형3] 정삼각형 색종이 접기 – AF의 길이 구하기 (AA닮음)"}
+      ]
+    };
+  }
+
+  // ─── 6회 (25문항 / 이등변삼각형 ~ 피타고라스의 정리) ───
+  if(!DB.exams['중2-2중-6회'] || DB.exams['중2-2중-6회'].total !== 25 || (DB.exams['중2-2중-6회'].questions && DB.exams['중2-2중-6회'].questions[0] && DB.exams['중2-2중-6회'].questions[0].comment.indexOf('∠BAD=35°') === -1)){
+    DB.exams['중2-2중-6회'] = {
+      total: 25,
+      questions: [
+        {num:1,  points:3, major:"이등변삼각형과 직각삼각형", unit:"이등변삼각형의 성질",   type:"객관식", diff:"하", comment:"AB=AC, ∠A 이등분선과 BC 교점 D, ∠BAD=35°·BD=5일 때 x+y"},
+        {num:2,  points:3, major:"평행사변형",               unit:"평행사변형의 성질",     type:"객관식", diff:"하", comment:"평행사변형에서 ∠A:∠B=3:2일 때 ∠A의 크기 구하기"},
+        {num:3,  points:3, major:"도형의 닮음",              unit:"닮은 도형의 성질",      type:"객관식", diff:"하", comment:"닮은 두 삼각뿔 OABC와 O′DEF – 옳지 않은 것 판별 (BC=15/2)"},
+        {num:4,  points:4, major:"여러 가지 사각형",         unit:"정사각형과 등변사다리꼴", type:"객관식", diff:"중", comment:"정사각형 대각선 BD 위 점 E, AD=ED일 때 ∠ECB의 크기"},
+        {num:5,  points:4, major:"이등변삼각형과 직각삼각형", unit:"직각삼각형의 합동",     type:"객관식", diff:"중", comment:"RHS합동 설명 과정 – 빈칸 (가)~(마)에 들어갈 말로 옳은 것"},
+        {num:6,  points:4, major:"삼각형의 외심과 내심",     unit:"삼각형의 내심",         type:"객관식", diff:"중", comment:"내접원 접점 D, 세 변 15·14·13·넓이 84일 때 △BID의 넓이"},
+        {num:7,  points:4, major:"이등변삼각형과 직각삼각형", unit:"직각삼각형의 합동",     type:"객관식", diff:"중", comment:"직각이등변삼각형, DE=10·넓이 26일 때 △ADB의 넓이 구하기"},
+        {num:8,  points:4, major:"이등변삼각형과 직각삼각형", unit:"이등변삼각형의 성질",   type:"객관식", diff:"중", comment:"DE를 접는 선으로 A와 C 겹치게 접기 – ∠BDC=100°일 때 ∠DCB"},
+        {num:9,  points:4, major:"삼각형의 외심과 내심",     unit:"삼각형의 외심",         type:"객관식", diff:"중", comment:"예각삼각형의 외심 O, ∠OBC=38°일 때 ∠BEC+∠CDB의 크기"},
+        {num:10, points:4, major:"삼각형의 외심과 내심",     unit:"삼각형의 내심",         type:"객관식", diff:"중", comment:"BC 위 외심 O와 △AOC의 내심 I, ∠ICA=35°일 때 ∠ABC"},
+        {num:11, points:4, major:"피타고라스 정리",           unit:"피타고라스 정리",       type:"객관식", diff:"중", comment:"중점 M에서 수선의 발 D,E, DB=EC – <보기> ㄱ~ㄷ 중 옳은 것"},
+        {num:12, points:4, major:"평행사변형",               unit:"평행사변형이 되는 조건", type:"객관식", diff:"중", comment:"<보기> ㄱ~ㄷ 중 평행사변형이 되는 경우 고르기"},
+        {num:13, points:4, major:"여러 가지 사각형",         unit:"직사각형과 마름모",     type:"객관식", diff:"중", comment:"<보기> ㄱ~ㄷ 중 직사각형이 되는 경우 고르기 (OA=OB=OC=OD)"},
+        {num:14, points:4, major:"여러 가지 사각형",         unit:"직사각형과 마름모",     type:"객관식", diff:"중", comment:"∠ADC=68° 마름모에서 AE⊥BC, AE와 BD 교점 F – ∠AFB"},
+        {num:15, points:4, major:"여러 가지 사각형",         unit:"직사각형과 마름모",     type:"객관식", diff:"중", comment:"AB=AD 평행사변형(마름모), △ABO 외접원 넓이 64π일 때 둘레"},
+        {num:16, points:4, major:"여러 가지 사각형",         unit:"정사각형과 등변사다리꼴", type:"객관식", diff:"중", comment:"정사각형에서 AD=AF, FE=FD일 때 ∠FDA의 크기 구하기"},
+        {num:17, points:4, major:"도형의 닮음",              unit:"닮은 도형의 성질",      type:"객관식", diff:"중", comment:"도형의 닮음에 대한 설명 중 옳은 것 모두 고르기 (정답 2개)"},
+        {num:18, points:4, major:"피타고라스 정리",           unit:"피타고라스 정리",       type:"객관식", diff:"중", comment:"마름모 한 변 5·대각선 6과 8, OF=p/q일 때 p-q의 값"},
+        {num:19, points:4, major:"도형의 닮음",              unit:"삼각형의 닮음조건",     type:"객관식", diff:"중", comment:"△ABC∽△CAD일 때 AC=x, CE=y에서 x+y의 값 구하기"},
+        {num:20, points:4, major:"피타고라스 정리",           unit:"피타고라스 정리",       type:"객관식", diff:"중", comment:"AB=7, AC=6, BD=5, CD=4일 때 AD의 길이 구하기"},
+        {num:21, points:4, major:"평행사변형",               unit:"평행사변형의 성질",     type:"객관식", diff:"중", comment:"AD=2AB 평행사변형, EF=2일 때 GF의 길이 구하기"},
+        {num:22, points:4, major:"평행사변형",               unit:"평행사변형의 성질",     type:"객관식", diff:"중", comment:"△ABF=20, △DFE=11일 때 △BEC의 넓이 구하기"},
+        {num:23, points:5, major:"여러 가지 사각형",         unit:"여러 가지 사각형의 관계", type:"객관식", diff:"중", comment:"둔각 이등변삼각형의 내심 I·외심 O – <보기> ㄱ~ㄹ 중 옳은 것"},
+        {num:24, points:5, major:"여러 가지 사각형",         unit:"여러 가지 사각형의 관계", type:"객관식", diff:"중", comment:"마름모 EBAD와 평행사변형 DACG – <보기> ㄱ~ㄷ 중 옳은 것"},
+        {num:25, points:5, major:"여러 가지 사각형",         unit:"정사각형과 등변사다리꼴", type:"객관식", diff:"중", comment:"AC⊥DB 등변사다리꼴에서 CE와 DE의 길이를 BC, AD로 나타내기"}
+      ]
+    };
+  }
   // =============================================
   // === 중3-1학기 기말고사 1~6회 시험지 데이터 ===
   // =============================================
@@ -3670,7 +3865,6 @@ function renderAttendanceStatsSection(){
 
 // === 학생 선택(체크박스) 관리 ===
 var _selectedStudents = {}; // {studentId: true}
-var _cardExamGroup = 'auto'; // 학생카드 응시현황 표시 기준 시험그룹 gkey ('auto'=자동선택)
 
 function toggleStudentSelect(id){
   if(_selectedStudents[id]) delete _selectedStudents[id];
@@ -3817,17 +4011,9 @@ function renderStudents(){
     var trend = getScoreTrend(s.id);
     var trendHtml = trend ? scoreTrendBadge(trend) : '';
     var phoneTag = s.parentPhone ? '<span style="font-size:10px;color:var(--ok);" title="리포트 암호: '+s.parentPhone.slice(-4)+'">🔒'+s.parentPhone.slice(-4)+'</span>' : '';
-    // 응시현황 dot (선택된 시험그룹 기준, 'auto'면 응시 기록이 가장 많은 그룹 자동선택)
+    // 응시현황 dot (학생의 학년에서 응시 기록이 가장 많은 시험그룹 1개를 대표로 표시)
     var attendDots = '';
-    var mainGroup = null;
-    if(_cardExamGroup && _cardExamGroup!=='auto'){
-      // 선택된 시험그룹 — 학생 학년의 그룹 중 gkey가 일치하는 것
-      var grps = getGroupsForGrade(GRADE_KEY_MAP[s.grade]);
-      mainGroup = grps.find(function(g){return g.gkey===_cardExamGroup;}) || null;
-    }
-    if(!mainGroup){
-      mainGroup = pickMainGroupForStudent(s.id, GRADE_KEY_MAP[s.grade]);
-    }
+    var mainGroup = pickMainGroupForStudent(s.id, GRADE_KEY_MAP[s.grade]);
     if(mainGroup){
       attendDots = '<div style="display:flex;align-items:center;gap:5px;margin-top:6px;">'
         +'<span style="font-size:9px;color:var(--mu);white-space:nowrap;">'+escHtml(mainGroup.glabel)+'</span>'
@@ -3847,43 +4033,18 @@ function renderStudents(){
       +phoneTag
       +(trendHtml?'<span class="badge b-pr" style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;">최근 '+trendHtml+'</span>':'')
       +'<div style="margin-left:auto;display:flex;gap:4px;">'
-      +'<button class="btn btn-mu btn-xs std-edit-btn" data-sid="'+s.id+'" onclick="event.stopPropagation();openStudentModal(\''+s.id+'\');">✏️ 수정</button>'
-      +'<button class="btn btn-ng btn-xs std-del-btn" data-sid="'+s.id+'" onclick="event.stopPropagation();doDeleteStudent(\''+s.id+'\');">🗑️</button>'
+      +'<button class="btn btn-mu btn-xs std-edit-btn" data-sid="'+s.id+'" onclick="event.stopPropagation();">✏️ 수정</button>'
+      +'<button class="btn btn-ng btn-xs std-del-btn" data-sid="'+s.id+'" onclick="event.stopPropagation();">🗑️</button>'
       +'</div></div></div></div></div>';
   }
 
   // 선택된 선생님 헤더
   var headLabel = (teacherFilter==='__none__') ? '❓ 담당 미지정' : ('👨‍🏫 '+escHtml(teacherFilter)+' 선생님');
   var headBg = (teacherFilter==='__none__') ? '#94a3b8' : 'linear-gradient(135deg,#1a3a6b,#2557a7)';
-
-  // 표시된 학생들의 학년 수집 → GRADE_LIST 순서(저학년→고학년)대로 시험그룹 옵션 구성
-  var presentGrades = {};
-  students.forEach(function(s){ var gk=GRADE_KEY_MAP[s.grade]; if(gk) presentGrades[gk]=true; });
-  var groupSeen = {}, groupOpts = [];
-  GRADE_LIST.forEach(function(g){
-    if(!presentGrades[g.key]) return;          // 현재 표시된 학년만
-    (g.groups||[]).forEach(function(grp){        // 그 학년의 시험그룹들 (학기 순서대로)
-      if(!groupSeen[grp.gkey]){ groupSeen[grp.gkey]=true; groupOpts.push({gkey:grp.gkey, glabel:grp.glabel}); }
-    });
-  });
-  // 선택값이 현재 목록에 없으면 auto로 초기화
-  if(_cardExamGroup!=='auto' && !groupSeen[_cardExamGroup]) _cardExamGroup='auto';
-  var examSelHtml = '';
-  if(groupOpts.length){
-    examSelHtml = '<select id="cardExamGroupSel" onchange="onCardExamGroupChange()" '
-      +'style="margin-left:auto;font-size:11px;padding:4px 8px;border-radius:6px;border:none;background:rgba(255,255,255,.92);color:#1a3a6b;font-weight:700;cursor:pointer;max-width:200px;">'
-      +'<option value="auto"'+(_cardExamGroup==='auto'?' selected':'')+'>📋 응시현황 (자동)</option>';
-    groupOpts.forEach(function(o){
-      examSelHtml += '<option value="'+escHtml(o.gkey)+'"'+(_cardExamGroup===o.gkey?' selected':'')+'>'+escHtml(o.glabel)+'</option>';
-    });
-    examSelHtml += '</select>';
-  }
-
   var gridHtml = '<div style="grid-column:1/-1;margin-bottom:4px;">'
     +'<div style="display:flex;align-items:center;gap:8px;padding:9px 14px;background:'+headBg+';border-radius:8px;color:#fff;">'
     +'<span style="font-size:14px;font-weight:800;">'+headLabel+'</span>'
     +'<span style="font-size:12px;opacity:.85;">'+students.length+'명</span>'
-    +examSelHtml
     +'</div></div>';
 
   if(gradeFilter){
@@ -3945,13 +4106,6 @@ function renderStudents(){
     var card = e.target.closest('.std-card');
     if(card) openStudentAttendanceModal(card.getAttribute('data-sid'));
   };
-}
-
-// 학생카드 응시현황 시험그룹 드롭다운 변경 → 카드만 다시 렌더
-function onCardExamGroupChange(){
-  var sel = document.getElementById('cardExamGroupSel');
-  if(sel){ _cardExamGroup = sel.value; }
-  renderStudents();
 }
 
 function initGradeFilter(){
