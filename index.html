@@ -560,6 +560,7 @@ body::before{content:'';position:fixed;inset:0;background:
         <button class="btn btn-pr btn-sm" onclick="openStudentModal()">＋ 학생 추가</button>
         <button class="btn btn-mu btn-sm" onclick="importStudents()">📥 일괄 입력</button>
         <button id="teacherManageBtn" class="btn btn-mu btn-sm" onclick="openTeacherManageStandalone()" style="display:none;">👨‍🏫 선생님 관리</button>
+        <button class="btn btn-sm" style="background:#ede9fe;color:#6d28d9;border:1.5px solid #c4b5fd;font-weight:800;" onclick="openPreStudents()">🎓 예비고1 명단</button>
       </div>
     </div>
 
@@ -688,6 +689,50 @@ body::before{content:'';position:fixed;inset:0;background:
 
       <!-- 분석 데이터 현황 -->
       <div id="examDataStatus" style="padding:12px 14px;border-radius:9px;font-size:12px;font-weight:700;"></div>
+
+      <!-- ===== 예비고1 전용: 문항 구성 설정 ===== -->
+      <div id="preExamSetup" style="display:none;margin-top:16px;border-top:2px dashed var(--bd);padding-top:14px;">
+        <div style="font-size:13px;font-weight:900;color:var(--pr);margin-bottom:4px;">🎓 문항 구성 설정 (예비고1 실전모의고사)</div>
+        <div style="font-size:11px;color:var(--mu);margin-bottom:10px;line-height:1.6;">
+          PDF를 올린 뒤 아래에서 <b>문항 수 · 배점 · 유형 · 난이도 · 단원</b>을 입력하면 수동 채점과 분석표 출력이 가능합니다.<br>
+          ① 빠른 생성으로 틀을 만들고 ② 표에서 문항별로 수정한 뒤 ③ 저장을 누르세요.
+        </div>
+
+        <div style="background:var(--pp);border-radius:10px;padding:12px 14px;margin-bottom:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;">
+          <div class="fg" style="min-width:90px;margin:0;"><label style="font-size:10px;">총 문항 수</label>
+            <input type="number" id="preQCount" value="25" min="1" max="60" style="padding:7px 9px;font-size:13px;"></div>
+          <div class="fg" style="min-width:90px;margin:0;"><label style="font-size:10px;">객관식 배점</label>
+            <input type="number" id="preQmPoint" value="4" min="1" max="20" step="0.1" style="padding:7px 9px;font-size:13px;"></div>
+          <div class="fg" style="min-width:110px;margin:0;"><label style="font-size:10px;">서술형 문항 수</label>
+            <input type="number" id="preQeCount" value="0" min="0" max="20" style="padding:7px 9px;font-size:13px;"></div>
+          <div class="fg" style="min-width:90px;margin:0;"><label style="font-size:10px;">서술형 배점</label>
+            <input type="number" id="preQePoint" value="6" min="1" max="30" step="0.1" style="padding:7px 9px;font-size:13px;"></div>
+          <button class="btn btn-pr btn-sm" onclick="preBuildRows()">⚙️ 빠른 생성</button>
+          <span id="preTotalPts" style="font-size:12px;font-weight:800;color:var(--pr);margin-left:auto;"></span>
+        </div>
+
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px;">
+          <span style="font-size:11px;font-weight:700;color:var(--mu);">일괄 적용:</span>
+          <select id="preBulkMajor" onchange="preFillBulkUnits()" style="padding:5px 8px;font-size:11px;border-radius:7px;border:1.5px solid var(--bd);"></select>
+          <select id="preBulkUnit" style="padding:5px 8px;font-size:11px;border-radius:7px;border:1.5px solid var(--bd);"></select>
+          <button class="btn btn-mu btn-sm" onclick="preApplyBulkUnit()">선택 단원 전체 적용</button>
+          <button class="btn btn-mu btn-sm" onclick="preApplyBulkDiff('하')">전체 난이도 하</button>
+          <button class="btn btn-mu btn-sm" onclick="preApplyBulkDiff('중')">전체 중</button>
+        </div>
+
+        <div class="tbl-wrap" style="max-height:420px;overflow:auto;border:1px solid var(--bd);border-radius:9px;">
+          <table class="tbl" style="font-size:11px;"><thead><tr>
+            <th style="width:44px;">번호</th><th style="width:70px;">배점</th><th style="width:88px;">유형</th>
+            <th style="width:74px;">난이도</th><th style="width:150px;">대단원</th><th style="width:170px;">소단원</th><th>문항 메모(선택)</th>
+          </tr></thead><tbody id="preQBody"></tbody></table>
+        </div>
+
+        <div style="display:flex;gap:8px;margin-top:12px;">
+          <button class="btn btn-pr" onclick="preSaveExam()">💾 문항 구성 저장</button>
+          <button class="btn btn-mu btn-sm" onclick="preLoadExam()">↺ 저장값 불러오기</button>
+          <button class="btn btn-sm" style="background:var(--nl);color:var(--ng);border:1.5px solid var(--ng);" onclick="preClearExam()">🗑️ 구성 삭제</button>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -719,6 +764,10 @@ body::before{content:'';position:fixed;inset:0;background:
           <option value="">시험지를 선택하세요</option>
         </select>
       </div>
+    </div>
+    <div id="preStudentManageBar" style="display:none;gap:10px;align-items:center;background:rgba(124,58,237,.07);border:1.5px solid rgba(124,58,237,.25);border-radius:10px;padding:10px 14px;margin-bottom:12px;flex-wrap:wrap;">
+      <span style="font-size:12px;font-weight:800;color:var(--pr);">🎓 예비고1 모의고사 모드 — 학생은 전용 명단에서만 선택됩니다</span>
+      <button class="btn btn-pr btn-sm" style="margin-left:auto;" onclick="openPreStudents()">👥 예비고1 명단 관리</button>
     </div>
     <div id="scorePanel" style="display:none;">
       <div style="background:var(--pp);border-radius:10px;padding:12px 16px;margin-bottom:14px;display:flex;gap:16px;align-items:center;flex-wrap:wrap;">
@@ -1126,6 +1175,44 @@ body::before{content:'';position:fixed;inset:0;background:
 </div><!-- end .body -->
 
 <!-- ===== 학생 추가/편집 모달 ===== -->
+<!-- ===== 예비고1 전용 학생 명단 모달 (기존 학생과 분리된 수동 입력) ===== -->
+<div class="modal-bg" id="preStudentModal">
+  <div class="modal" style="max-width:720px;">
+    <div class="modal-hd">
+      <div class="ci">🎓</div>
+      <h3>예비고1 모의고사 — 학생 명단 (수동 입력)</h3>
+    </div>
+    <div class="modal-bd">
+      <div style="font-size:11px;color:var(--mu);line-height:1.6;margin-bottom:12px;">
+        이 명단은 <b>기존 학생 관리와 완전히 분리</b>되어 있습니다. 여기 등록된 학생만 예비고1 실전모의고사 채점·분석 대상이 됩니다.
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;background:var(--pp);border-radius:10px;padding:12px 14px;margin-bottom:14px;">
+        <div class="fg" style="margin:0;min-width:130px;flex:1;"><label style="font-size:10px;">이름 *</label>
+          <input type="text" id="preSName" placeholder="홍길동" style="padding:8px 10px;font-size:13px;font-weight:700;"
+            onkeydown="if(event.key==='Enter')document.getElementById('preSSchool').focus();"></div>
+        <div class="fg" style="margin:0;min-width:130px;flex:1;"><label style="font-size:10px;">출신 중학교</label>
+          <input type="text" id="preSSchool" placeholder="예) 대청중" style="padding:8px 10px;font-size:13px;"
+            onkeydown="if(event.key==='Enter')document.getElementById('preSMemo').focus();"></div>
+        <div class="fg" style="margin:0;min-width:150px;flex:1.4;"><label style="font-size:10px;">메모(반·연락처 등)</label>
+          <input type="text" id="preSMemo" placeholder="예) 월수금 A반" style="padding:8px 10px;font-size:13px;"
+            onkeydown="if(event.key==='Enter')savePreStudent();"></div>
+        <button class="btn btn-pr btn-sm" id="preSSaveBtn" onclick="savePreStudent()">＋ 추가</button>
+        <button class="btn btn-mu btn-sm" id="preSCancelBtn" onclick="preCancelEdit()" style="display:none;">취소</button>
+      </div>
+      <div class="tbl-wrap" style="max-height:340px;overflow:auto;border:1px solid var(--bd);border-radius:9px;">
+        <table class="tbl" style="font-size:12px;"><thead><tr>
+          <th style="width:46px;">#</th><th style="width:110px;">이름</th><th style="width:120px;">출신 중학교</th>
+          <th>메모</th><th style="width:88px;">응시</th><th style="width:110px;">관리</th>
+        </tr></thead><tbody id="preStudentBody"></tbody></table>
+      </div>
+    </div>
+    <div class="modal-ft">
+      <span id="preStudentCount" style="margin-right:auto;font-size:12px;font-weight:700;color:var(--mu);"></span>
+      <button class="btn btn-mu" onclick="closePreStudents()">닫기</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-bg" id="studentModal">
   <div class="modal" style="max-width:420px;">
     <div class="modal-hd">
@@ -3031,6 +3118,377 @@ var COMMENT_DB = {"덧셈, 뺄셈, 곱셈, 나눗셈이 섞인 식": {"wrong": {
 })();
 
 // =============================================
+// === 예비고1(공통수학1) · 중학 복습 소단원 진단 코멘트 추가 ===
+(function(){
+  var H1 = {
+"다항식의 연산": {
+  "wrong": {
+    "개념확인형": {
+      "diagnosis": "다항식의 덧셈·뺄셈에서 괄호 앞의 부호를 분배하지 않거나, 동류항을 차수별로 정리하는 과정이 흔들리고 있어요.",
+      "improve": "식을 내림차순으로 먼저 정렬하고, 뺄셈은 반드시 '＋(−1)×( )' 꼴로 바꿔 괄호를 푸는 순서를 지켜 연습하세요.",
+      "advice": "계산 전에 차수 순으로 줄을 맞춰 쓰는 습관 하나로 부호 실수의 대부분이 사라집니다."
+    },
+    "계산형": {
+      "diagnosis": "전개 자체는 되지만 항의 개수가 많아질 때 특정 항을 빠뜨리거나 계수를 잘못 더하고 있어요.",
+      "improve": "전개할 때 '어느 항과 어느 항을 곱했는지' 화살표로 표시하고, 같은 차수끼리 묶어 더하는 2단계로 나눠 쓰세요.",
+      "advice": "한 번에 답을 쓰지 말고 전개 → 정리 두 줄로 나누면 검산이 쉬워집니다."
+    },
+    "응용형": {
+      "diagnosis": "조건식을 그대로 전개하려다 계산이 길어지고 있어요. 식의 변형(치환·대칭식)을 이용하는 발상이 아직 나오지 않습니다.",
+      "improve": "x+y, xy처럼 묶어서 처리하는 대칭식 변형과, 공통부분을 하나의 문자로 치환하는 연습을 집중적으로 해보세요.",
+      "advice": "전개가 길어진다고 느끼면 그 순간이 치환을 떠올릴 신호입니다."
+    },
+    "서술형": {
+      "diagnosis": "답은 맞았지만 식을 변형한 근거(어떤 공식을 썼는지)를 쓰지 않아 과정 점수를 놓쳤어요.",
+      "improve": "사용한 곱셈 공식이나 치환을 한 줄로 밝히고 계산을 이어가는 형식으로 답안을 작성하세요.",
+      "advice": "'(∵ 곱셈 공식)' 한 줄이 배점을 지켜줍니다."
+    }
+  },
+  "right": {
+    "계산형": { "diagnosis": "다항식의 연산을 정확하고 안정적으로 처리하고 있어요.", "improve": "계수가 분수·문자인 복합 전개로 확장해 보세요.", "advice": "정리 습관이 잘 잡혀 있습니다." },
+    "응용형": { "diagnosis": "치환과 대칭식 변형을 자연스럽게 활용하고 있어요.", "improve": "조건식이 두 개 이상인 상위 문항에 도전해 보세요.", "advice": "식을 보는 눈이 좋습니다." }
+  }
+},
+"복소수와 그 연산": {
+  "wrong": {
+    "개념확인형": {
+      "diagnosis": "i²=−1이라는 정의는 알지만, 실수부·허수부를 구분하거나 '순허수'와 '허수'의 차이를 판정하는 데서 흔들리고 있어요.",
+      "improve": "a+bi 꼴로 반드시 정리한 뒤 a와 b가 각각 무엇인지 적어보는 연습을 하세요. 순허수는 a=0이고 b≠0임을 함께 기억하세요.",
+      "advice": "'실수부 a, 허수부 b'를 적고 시작하면 조건 판별 문제는 대부분 한 줄로 끝납니다."
+    },
+    "계산형": {
+      "diagnosis": "복소수의 곱셈·나눗셈에서 i²을 −1로 바꾸는 단계를 빠뜨리거나, 분모의 켤레를 곱하는 유리화가 정확하지 않아요.",
+      "improve": "나눗셈은 반드시 '분모의 켤레복소수를 분자·분모에 곱한다'를 한 줄 쓰고 시작하세요. i의 거듭제곱은 4주기(i, −1, −i, 1)로 정리해 두세요.",
+      "advice": "i의 거듭제곱은 지수를 4로 나눈 나머지만 보면 됩니다."
+    },
+    "응용형": {
+      "diagnosis": "켤레복소수의 성질이나 'a+bi=0 ⟺ a=0, b=0'(복소수의 상등)을 조건식으로 바꾸는 연결이 끊기고 있어요.",
+      "improve": "문자가 실수라는 조건이 주어지면 실수부와 허수부를 각각 0으로 놓아 연립하는 전형적인 흐름을 반복 연습하세요.",
+      "advice": "'실수부=실수부, 허수부=허수부'로 분리하는 순간 문제는 연립방정식이 됩니다."
+    },
+    "서술형": {
+      "diagnosis": "유리화나 상등을 사용한 근거를 쓰지 않고 결과만 제시해 부분점수를 잃었어요.",
+      "improve": "① 켤레를 곱하는 이유 ② 복소수의 상등 조건 ③ 연립 풀이, 세 단계를 나눠 쓰는 형식으로 연습하세요.",
+      "advice": "근거 한 줄이 계산 전체보다 배점이 큰 경우가 많습니다."
+    }
+  },
+  "right": {
+    "계산형": { "diagnosis": "복소수의 사칙연산과 i의 거듭제곱을 정확히 처리하고 있어요.", "improve": "켤레복소수 성질을 이용하는 증명형 문항으로 확장해 보세요.", "advice": "4주기 정리가 잘 되어 있습니다." },
+    "응용형": { "diagnosis": "복소수의 상등을 조건식으로 바꾸는 흐름이 안정적입니다.", "improve": "이차방정식의 허근과 연결된 상위 문항에 도전해 보세요.", "advice": "분리해서 연립하는 감각이 좋습니다." }
+  }
+},
+"이차방정식과 이차함수": {
+  "wrong": {
+    "개념확인형": {
+      "diagnosis": "이차함수의 그래프와 x축의 교점이 곧 이차방정식의 실근이라는 연결이 아직 자동으로 떠오르지 않고 있어요.",
+      "improve": "'판별식 D>0이면 교점 2개, D=0이면 접함, D<0이면 만나지 않음'을 그래프 그림과 함께 세 줄로 정리해 두세요.",
+      "advice": "교점의 개수를 묻는 문제는 결국 판별식의 부호 문제입니다."
+    },
+    "계산형": {
+      "diagnosis": "교점의 좌표나 꼭짓점을 구하는 과정에서 완전제곱 변형이나 근과 계수의 관계 적용이 정확하지 않아요.",
+      "improve": "y=a(x−p)²+q 꼴로 바꾸는 완전제곱 변형을 손으로 반복하고, 두 근의 합·곱을 바로 쓰는 연습을 함께 하세요.",
+      "advice": "꼭짓점을 묻는 순간 완전제곱, 두 근의 관계를 묻는 순간 근과 계수의 관계입니다."
+    },
+    "응용형": {
+      "diagnosis": "직선과 포물선의 위치 관계를 연립한 뒤 판별식으로 바꾸는 단계에서 식 정리가 끊기고 있어요.",
+      "improve": "연립 → 한 변을 0으로 정리 → 판별식 계산, 이 3단계를 고정된 순서로 쓰는 연습을 하세요.",
+      "advice": "위치 관계 문제의 답은 거의 항상 판별식의 부호에 있습니다."
+    },
+    "서술형": {
+      "diagnosis": "그래프의 개형이나 조건의 근거를 쓰지 않고 식만 나열해 논리의 연결이 비어 있어요.",
+      "improve": "조건을 식으로 바꾼 이유를 한 줄로 밝히고, 마지막에 범위를 다시 조건에 대입해 확인하는 문장을 넣으세요.",
+      "advice": "구한 범위를 조건에 되돌려 확인하는 한 줄이 완결성을 만듭니다."
+    }
+  },
+  "right": {
+    "계산형": { "diagnosis": "이차방정식과 이차함수의 연결을 정확히 다루고 있어요.", "improve": "최대·최소와 결합된 문항으로 확장해 보세요.", "advice": "판별식 활용이 안정적입니다." },
+    "응용형": { "diagnosis": "직선과 포물선의 위치 관계를 안정적으로 판정하고 있어요.", "improve": "매개변수가 포함된 상위 문항에 도전해 보세요.", "advice": "연립 후 정리하는 순서가 좋습니다." }
+  }
+},
+"고차방정식": {
+  "wrong": {
+    "개념확인형": {
+      "diagnosis": "삼차·사차방정식을 풀 때 인수정리로 한 근을 먼저 찾아 인수분해한다는 기본 전략이 떠오르지 않고 있어요.",
+      "improve": "상수항의 약수를 후보로 대입해 f(α)=0인 α를 찾고, 조립제법으로 내리는 과정을 한 세트로 반복 연습하세요.",
+      "advice": "고차방정식은 '한 근 찾기 → 조립제법 → 남은 이차식 풀기'가 거의 전부입니다."
+    },
+    "계산형": {
+      "diagnosis": "조립제법의 계수 배열이나 부호 처리에서 실수가 나오고 있어요.",
+      "improve": "빠진 차수의 계수를 0으로 반드시 채워 넣고 조립제법을 시작하는 습관을 들이세요.",
+      "advice": "계수를 빠짐없이 나열하는 것만으로 조립제법 실수의 대부분이 사라집니다."
+    },
+    "응용형": {
+      "diagnosis": "공통부분 치환이나 복이차식(x²=t) 변형을 떠올리지 못해 식이 길어지고 있어요.",
+      "improve": "x⁴ 꼴이 보이면 x²=t 치환, (x²+ax) 같은 덩어리가 반복되면 그 덩어리를 t로 두는 두 가지 패턴을 익히세요.",
+      "advice": "같은 덩어리가 두 번 보이면 치환 신호입니다."
+    },
+    "서술형": {
+      "diagnosis": "인수분해 과정이나 허근을 버리지 않고 모두 제시했는지 확인하지 않아 감점이 생겼어요.",
+      "improve": "구한 모든 근을 마지막에 한 줄로 정리해 쓰고, 조건(실근만 등)에 맞는지 점검하는 문장을 넣으세요.",
+      "advice": "근을 빠뜨리지 않았는지 마지막에 한 번 세어보세요."
+    }
+  },
+  "right": {
+    "계산형": { "diagnosis": "인수정리와 조립제법을 정확히 활용하고 있어요.", "improve": "계수가 문자인 고차방정식으로 확장해 보세요.", "advice": "계수 배열이 꼼꼼합니다." },
+    "응용형": { "diagnosis": "치환을 이용한 변형이 안정적입니다.", "improve": "근의 조건이 걸린 상위 문항에 도전해 보세요.", "advice": "덩어리를 보는 눈이 좋습니다." }
+  }
+},
+"연립방정식": {
+  "wrong": {
+    "개념확인형": {
+      "diagnosis": "일차식과 이차식이 섞인 연립방정식에서 어느 식을 대입해야 계산이 짧아지는지 판단이 서지 않고 있어요.",
+      "improve": "일차식을 한 문자에 대해 정리한 뒤 이차식에 대입하는 것이 기본 순서임을 기억하고, 그 순서로만 10문항을 풀어보세요.",
+      "advice": "항상 일차식을 먼저 정리합니다. 반대로 하면 계산이 두 배가 됩니다."
+    },
+    "계산형": {
+      "diagnosis": "대입 후 전개·정리 과정에서 부호나 제곱 전개가 어긋나 해가 달라지고 있어요.",
+      "improve": "대입한 식을 괄호째 쓴 다음 전개하는 두 줄 쓰기를 지키고, 구한 해를 원래 두 식에 모두 넣어 검산하세요.",
+      "advice": "연립방정식은 검산이 쉬운 단원입니다. 꼭 대입해 확인하세요."
+    },
+    "응용형": {
+      "diagnosis": "대칭형 연립(합과 곱이 주어진 꼴)에서 u=x+y, v=xy로 바꾸는 발상이 나오지 않고 있어요.",
+      "improve": "x+y와 xy로 식을 바꾼 뒤 t에 대한 이차방정식으로 되돌리는 전형적인 흐름을 익히세요.",
+      "advice": "x와 y를 바꿔도 같은 식이면 합·곱 치환이 정답 루트입니다."
+    },
+    "서술형": {
+      "diagnosis": "해를 모두 구했는지, 순서쌍으로 제시했는지 확인하지 않아 감점이 발생했어요.",
+      "improve": "최종 답을 (x, y) 순서쌍으로 모두 나열하고, 조건에 맞지 않는 해를 버린 이유를 쓰세요.",
+      "advice": "해가 2개 이상인 경우를 빠뜨리지 않았는지 확인하세요."
+    }
+  },
+  "right": {
+    "계산형": { "diagnosis": "연립방정식을 정확한 순서로 풀어내고 있어요.", "improve": "문자 계수가 포함된 연립으로 확장해 보세요.", "advice": "검산 습관이 좋습니다." },
+    "응용형": { "diagnosis": "대칭형 치환을 자연스럽게 활용하고 있어요.", "improve": "부정방정식 유형에 도전해 보세요.", "advice": "식의 구조를 잘 봅니다." }
+  }
+},
+"연립일차부등식": {
+  "wrong": {
+    "개념확인형": {
+      "diagnosis": "각 부등식을 따로 푸는 것까지는 되지만, 두 해를 수직선 위에서 겹치는 범위로 합치는 단계가 정확하지 않아요.",
+      "improve": "반드시 수직선을 그려 두 범위를 위아래로 나란히 표시하고, 겹치는 구간만 색칠하는 방식으로 답을 정하세요.",
+      "advice": "머릿속으로 합치지 말고 수직선을 그리세요. 이 단원은 그림이 곧 답입니다."
+    },
+    "계산형": {
+      "diagnosis": "음수를 곱하거나 나눌 때 부등호의 방향을 바꾸는 규칙을 놓치고 있어요.",
+      "improve": "음수로 나누는 순간 부등호에 동그라미를 치고 방향을 바꾸는 표시를 하는 습관을 들이세요.",
+      "advice": "부등호 방향 전환은 음수를 곱하거나 나눌 때만 일어납니다."
+    },
+    "응용형": {
+      "diagnosis": "해가 존재할 조건이나 정수해의 개수 조건을 범위의 경계로 바꾸는 과정에서 등호 포함 여부를 놓치고 있어요.",
+      "improve": "경계값을 직접 대입해 성립하는지 확인하고 등호를 결정하는 연습을 하세요.",
+      "advice": "정수해 개수 문제는 경계에서 등호 하나로 답이 갈립니다."
+    },
+    "서술형": {
+      "diagnosis": "두 범위를 합치는 근거(수직선)를 제시하지 않아 과정 점수를 잃었어요.",
+      "improve": "수직선 그림을 답안에 직접 그리고 '공통 범위'라고 명시하는 형식으로 작성하세요.",
+      "advice": "그림도 서술의 일부로 인정됩니다. 반드시 그리세요."
+    }
+  },
+  "right": {
+    "계산형": { "diagnosis": "연립부등식의 공통 범위를 정확히 찾아내고 있어요.", "improve": "A<B<C 꼴의 연립으로 확장해 보세요.", "advice": "부등호 처리가 안정적입니다." },
+    "응용형": { "diagnosis": "정수해 조건까지 정확히 다루고 있어요.", "improve": "미지수가 포함된 조건 문제에 도전해 보세요.", "advice": "경계 처리가 꼼꼼합니다." }
+  }
+},
+"절댓값 부등식": {
+  "wrong": {
+    "개념확인형": {
+      "diagnosis": "|x|<a와 |x|>a의 해 모양(−a<x<a / x<−a 또는 x>a)이 서로 바뀌어 기억되고 있어요.",
+      "improve": "'작으면 사이, 크면 바깥'이라는 한 문장으로 정리하고, 수직선에 거리로 해석해 두 모양을 그려두세요.",
+      "advice": "|x|는 원점으로부터의 거리입니다. 거리로 읽으면 두 모양이 헷갈리지 않습니다."
+    },
+    "계산형": {
+      "diagnosis": "절댓값 안의 식이 일차식일 때 전체를 하나의 덩어리로 보지 않고 x만 따로 처리해 범위가 어긋나고 있어요.",
+      "improve": "|2x−3|<5라면 −5<2x−3<5로 통째로 바꾼 뒤 정리하는 순서를 지키세요.",
+      "advice": "절댓값 안의 식 전체가 하나의 덩어리입니다."
+    },
+    "응용형": {
+      "diagnosis": "절댓값 기호가 두 개 이상이거나 안쪽 식의 부호가 갈리는 경우, 구간을 나누는 기준점을 잡지 못하고 있어요.",
+      "improve": "절댓값 안이 0이 되는 x값을 모두 찾아 수직선을 구간으로 나눈 뒤, 구간마다 부호를 결정해 푸는 연습을 하세요.",
+      "advice": "기준점을 먼저 찍고 구간을 나누면 복잡해 보이던 문제가 단순한 일차부등식 몇 개가 됩니다."
+    },
+    "서술형": {
+      "diagnosis": "구간을 나눈 근거와 각 구간에서 구한 해를 합치는 과정을 쓰지 않아 감점이 생겼어요.",
+      "improve": "① 기준점 ② 구간별 식 ③ 구간별 해 ④ 합집합, 네 단계를 나눠 쓰는 형식으로 연습하세요.",
+      "advice": "마지막에 각 구간의 해를 합치는 문장을 반드시 쓰세요."
+    }
+  },
+  "right": {
+    "계산형": { "diagnosis": "절댓값 부등식의 기본형을 정확히 처리하고 있어요.", "improve": "절댓값이 두 개인 유형으로 확장해 보세요.", "advice": "덩어리로 보는 감각이 좋습니다." },
+    "응용형": { "diagnosis": "구간을 나누어 처리하는 흐름이 안정적입니다.", "improve": "그래프와 연결된 상위 문항에 도전해 보세요.", "advice": "기준점 설정이 정확합니다." }
+  }
+},
+"행렬의 뜻과 성분": {
+  "wrong": {
+    "개념확인형": {
+      "diagnosis": "행과 열의 순서(m×n은 m행 n열), (i, j) 성분의 의미가 아직 자동으로 읽히지 않고 있어요.",
+      "improve": "a₍ᵢⱼ₎에서 앞 번호가 행, 뒤 번호가 열임을 소리 내어 읽고, 작은 행렬을 직접 써보며 성분 위치를 짚는 연습을 하세요.",
+      "advice": "'행 먼저, 열 나중' 한 문장만 기억하면 됩니다."
+    },
+    "계산형": {
+      "diagnosis": "일반항으로 주어진 행렬의 성분을 계산할 때 i와 j를 바꿔 대입하는 실수가 나오고 있어요.",
+      "improve": "표를 그려 i는 세로, j는 가로로 두고 칸을 하나씩 채우는 방식으로 연습하세요.",
+      "advice": "표를 그리면 대입 순서를 틀릴 일이 없습니다."
+    },
+    "응용형": {
+      "diagnosis": "실생활 자료를 행렬로 옮기거나 행렬을 다시 해석하는 과정에서 행·열이 무엇을 의미하는지 놓치고 있어요.",
+      "improve": "행렬 옆에 '행=학생, 열=과목'처럼 의미를 적어두고 읽는 습관을 들이세요.",
+      "advice": "행과 열이 무엇인지 적어두는 한 줄이 해석 문제를 쉽게 만듭니다."
+    },
+    "서술형": { "diagnosis": "성분의 의미를 설명하지 않고 값만 제시해 과정 점수를 잃었어요.", "improve": "구한 성분이 무엇을 뜻하는지 한 문장으로 덧붙이는 연습을 하세요.", "advice": "의미를 쓰는 한 줄이 배점입니다." }
+  },
+  "right": {
+    "계산형": { "diagnosis": "행렬의 성분과 꼴을 정확히 다루고 있어요.", "improve": "일반항이 복잡한 행렬로 확장해 보세요.", "advice": "'행 먼저'가 잘 잡혀 있습니다." },
+    "응용형": { "diagnosis": "자료를 행렬로 옮기는 해석이 안정적입니다.", "improve": "행렬 연산과 결합된 자료 해석 문항에 도전해 보세요.", "advice": "의미 파악이 정확합니다." }
+  }
+},
+"행렬의 덧셈·상수배": {
+  "wrong": {
+    "개념확인형": {
+      "diagnosis": "행렬의 덧셈은 같은 꼴일 때만 가능하다는 조건과, 상수배는 모든 성분에 곱한다는 규칙 중 하나를 놓치고 있어요.",
+      "improve": "연산 전에 두 행렬의 꼴(m×n)을 먼저 적어 비교하는 습관을 들이고, 상수배는 괄호 안 모든 성분에 분배함을 표시하세요.",
+      "advice": "꼴이 다르면 덧셈 자체가 불가능합니다. 꼴 확인이 0단계입니다."
+    },
+    "계산형": {
+      "diagnosis": "성분별 계산은 되지만 뺄셈이나 음의 상수배에서 부호 처리가 어긋나고 있어요.",
+      "improve": "A−B를 A+(−1)B로 바꿔 쓴 뒤 계산하면 부호 실수가 줄어듭니다. 같은 자리끼리 세로로 맞춰 쓰세요.",
+      "advice": "같은 위치의 성분끼리만 계산한다는 원칙을 매번 확인하세요."
+    },
+    "응용형": {
+      "diagnosis": "행렬이 포함된 등식을 A에 대해 정리하는 과정에서 이항과 상수배 분배를 함께 처리하지 못하고 있어요.",
+      "improve": "숫자 방정식을 푸는 것과 똑같은 순서(이항 → 양변 나누기)로 풀되, 나눌 때는 상수의 역수를 곱하는 형태로 쓰세요.",
+      "advice": "행렬 등식도 결국 일차방정식과 같은 순서로 풉니다."
+    },
+    "서술형": { "diagnosis": "꼴이 같다는 조건을 확인한 문장 없이 바로 계산해 감점이 생겼어요.", "improve": "'두 행렬이 모두 2×2이므로 덧셈이 가능하다'와 같은 전제 문장을 먼저 쓰세요.", "advice": "전제를 밝히는 한 줄을 아끼지 마세요." }
+  },
+  "right": {
+    "계산형": { "diagnosis": "행렬의 덧셈·뺄셈·상수배를 정확히 처리하고 있어요.", "improve": "행렬 등식에서 미지 행렬을 구하는 문항으로 확장해 보세요.", "advice": "부호 처리가 안정적입니다." },
+    "응용형": { "diagnosis": "행렬 등식 변형이 자연스럽습니다.", "improve": "곱셈이 함께 등장하는 복합 문항에 도전해 보세요.", "advice": "정리 순서가 좋습니다." }
+  }
+},
+"행렬의 곱셈": {
+  "wrong": {
+    "개념확인형": {
+      "diagnosis": "곱셈이 가능하려면 앞 행렬의 열의 수와 뒤 행렬의 행의 수가 같아야 한다는 조건, 그리고 AB≠BA임을 놓치고 있어요.",
+      "improve": "(m×n)(n×p)=(m×p)를 손으로 써보며 가운데 n이 맞아야 함을 확인하는 연습을 하세요. 교환법칙이 성립하지 않음을 반례로 확인해 두세요.",
+      "advice": "행렬은 곱하는 순서가 바뀌면 결과가 달라집니다. AB와 BA는 다른 것입니다."
+    },
+    "계산형": {
+      "diagnosis": "'앞의 행 × 뒤의 열'로 대응시켜 더하는 과정에서 짝을 잘못 맞추고 있어요.",
+      "improve": "구하려는 성분이 (i, j)라면 왼손으로 i행을, 오른손으로 j열을 짚으며 곱해 더하는 방식으로 한 칸씩 채우세요.",
+      "advice": "한 성분씩 '행 가로, 열 세로'로 짚으면 실수가 사라집니다."
+    },
+    "응용형": {
+      "diagnosis": "곱셈이 포함된 등식을 전개할 때 교환법칙이 성립하지 않는다는 점을 잊고 보통의 곱셈처럼 전개하고 있어요.",
+      "improve": "(A+B)²=A²+AB+BA+B²처럼 순서를 유지한 채 전개하는 연습을 반복하세요.",
+      "advice": "AB와 BA를 합쳐 2AB로 쓰는 순간 틀립니다. 조건이 주어진 경우에만 합칠 수 있습니다."
+    },
+    "서술형": { "diagnosis": "전개 과정에서 순서를 유지했다는 점이 드러나지 않아 감점이 생겼어요.", "improve": "전개한 각 항을 순서대로 나열하고, 교환법칙을 쓸 수 없음을 한 줄 명시하세요.", "advice": "순서를 지킨 전개 자체가 채점 포인트입니다." }
+  },
+  "right": {
+    "계산형": { "diagnosis": "행렬의 곱셈을 정확하게 계산하고 있어요.", "improve": "세 행렬의 곱으로 확장해 보세요.", "advice": "성분 대응이 정확합니다." },
+    "응용형": { "diagnosis": "교환법칙이 성립하지 않음을 의식하며 전개하고 있어요.", "improve": "AB=BA 조건이 주어진 상위 문항에 도전해 보세요.", "advice": "순서를 지키는 습관이 좋습니다." }
+  }
+},
+"행렬의 거듭제곱": {
+  "wrong": {
+    "개념확인형": {
+      "diagnosis": "A², A³을 직접 계산해 규칙을 찾는 접근 대신 공식을 찾으려 해서 출발이 막히고 있어요.",
+      "improve": "먼저 A²을 계산하고 A³까지 구해 성분의 변화 규칙을 관찰하는 순서를 지키세요. 대부분 주기가 보입니다.",
+      "advice": "거듭제곱 문제는 '직접 두세 번 계산해 규칙 찾기'가 정석입니다."
+    },
+    "계산형": {
+      "diagnosis": "A²까지는 맞지만 그 뒤 반복 계산에서 성분을 잘못 옮겨 규칙이 어긋나고 있어요.",
+      "improve": "매 단계의 결과를 지우지 말고 세로로 나란히 적어 비교하며 주기를 확인하세요.",
+      "advice": "중간 결과를 남겨두면 주기가 눈에 보입니다."
+    },
+    "응용형": {
+      "diagnosis": "주기를 찾은 뒤 지수를 주기로 나눈 나머지로 환원하는 마지막 단계에서 막히고 있어요.",
+      "improve": "'주기가 k이면 Aⁿ은 지수를 k로 나눈 나머지에 해당하는 행렬과 같다'를 한 줄로 쓰고 적용하는 연습을 하세요.",
+      "advice": "주기를 찾았다면 남은 것은 나머지 계산뿐입니다."
+    },
+    "서술형": { "diagnosis": "주기를 찾은 근거를 쓰지 않고 결과만 제시해 과정 점수를 잃었어요.", "improve": "A², A³을 실제로 보여주고 '따라서 주기는 k이다'라고 명시하는 형식으로 쓰세요.", "advice": "규칙을 발견한 과정 자체가 배점입니다." }
+  },
+  "right": {
+    "계산형": { "diagnosis": "거듭제곱의 규칙을 정확히 찾아내고 있어요.", "improve": "주기가 긴 행렬로 확장해 보세요.", "advice": "관찰 과정이 체계적입니다." },
+    "응용형": { "diagnosis": "주기와 나머지를 이용한 환원이 안정적입니다.", "improve": "거듭제곱과 연립이 결합된 문항에 도전해 보세요.", "advice": "규칙을 보는 눈이 좋습니다." }
+  }
+},
+"피타고라스 정리": {
+  "wrong": {
+    "개념확인형": {
+      "diagnosis": "빗변이 어느 변인지 확인하지 않고 식을 세워, a²+b²=c²에서 c의 자리가 바뀌고 있어요.",
+      "improve": "직각 표시를 먼저 찾고 그 맞은편 변에 '빗변'이라고 적은 뒤 식을 세우는 순서를 지키세요.",
+      "advice": "빗변은 항상 직각의 맞은편입니다. 표시부터 하고 시작하세요."
+    },
+    "계산형": {
+      "diagnosis": "식은 맞게 세우지만 제곱근을 정리하거나 무리수 형태로 답을 쓰는 과정에서 어긋나고 있어요.",
+      "improve": "√ 안의 수를 소인수분해해 제곱인 인수를 밖으로 꺼내는 연습을 반복하세요.",
+      "advice": "자주 쓰이는 직각삼각형 비(3:4:5, 5:12:13)를 외워두면 계산이 빨라집니다."
+    },
+    "응용형": {
+      "diagnosis": "복잡한 도형에서 직각삼각형을 직접 만들어 내는 보조선 발상이 나오지 않고 있어요.",
+      "improve": "구하려는 선분을 한 변으로 하는 직각삼각형을 만들기 위해 수선을 긋는 연습을 집중적으로 해보세요.",
+      "advice": "길이를 구해야 하면 먼저 직각삼각형을 만들 수 있는지 살펴보세요."
+    },
+    "서술형": { "diagnosis": "어느 삼각형에서 정리를 적용했는지 밝히지 않아 과정 점수를 잃었어요.", "improve": "'△ABH에서 피타고라스 정리에 의하여'처럼 적용 대상을 명시하고 식을 쓰세요.", "advice": "적용 대상을 쓰는 한 줄이 배점입니다." }
+  },
+  "right": {
+    "계산형": { "diagnosis": "피타고라스 정리를 정확히 적용하고 있어요.", "improve": "입체도형의 대각선 길이 문제로 확장해 보세요.", "advice": "빗변 확인이 습관화되어 있습니다." },
+    "응용형": { "diagnosis": "보조선을 그어 직각삼각형을 만드는 발상이 안정적입니다.", "improve": "접은 도형·원과 결합된 상위 문항에 도전해 보세요.", "advice": "도형을 보는 눈이 좋습니다." }
+  }
+},
+"원의 성질": {
+  "wrong": {
+    "개념확인형": {
+      "diagnosis": "중심각과 원주각의 관계(중심각은 원주각의 2배), 같은 호에 대한 원주각이 같다는 성질이 서로 섞여 있어요.",
+      "improve": "문제의 각이 '중심에서 본 각'인지 '원 위에서 본 각'인지 먼저 표시하고, 같은 호를 색으로 묶어 보는 연습을 하세요.",
+      "advice": "같은 호를 찾는 것이 원 문제의 절반입니다. 호부터 표시하세요."
+    },
+    "계산형": {
+      "diagnosis": "관계식은 알지만 호의 대응을 잘못 짚어 두 배·절반을 반대로 적용하고 있어요.",
+      "improve": "각마다 어느 호에 대한 각인지 화살표로 적어두고, 중심각=2×원주각을 그 자리에 바로 쓰세요.",
+      "advice": "각 옆에 '호 AB에 대한 각'이라고 적어두면 헷갈리지 않습니다."
+    },
+    "응용형": {
+      "diagnosis": "원에 내접하는 사각형의 대각의 합이 180°라는 성질이나 접선과 현이 이루는 각을 연결하지 못하고 있어요.",
+      "improve": "원에 내접하는 사각형, 접선이 보이면 각각의 대표 성질을 먼저 적어두고 시작하는 연습을 하세요.",
+      "advice": "원 문제는 아는 성질을 그림에 먼저 써넣는 순간 풀리기 시작합니다."
+    },
+    "서술형": { "diagnosis": "어떤 성질을 사용했는지 밝히지 않아 과정 점수를 잃었어요.", "improve": "'한 호에 대한 원주각은 모두 같으므로'처럼 근거를 문장으로 쓰고 식을 이어가세요.", "advice": "근거 한 줄이 배점의 절반인 경우가 많습니다." }
+  },
+  "right": {
+    "계산형": { "diagnosis": "원주각과 중심각의 관계를 정확히 적용하고 있어요.", "improve": "접선과 현이 이루는 각으로 확장해 보세요.", "advice": "호의 대응을 잘 짚습니다." },
+    "응용형": { "diagnosis": "원에 내접하는 사각형의 성질까지 안정적으로 활용하고 있어요.", "improve": "원과 닮음이 결합된 상위 문항에 도전해 보세요.", "advice": "성질을 먼저 표시하는 습관이 좋습니다." }
+  }
+},
+"도형의 닮음": {
+  "wrong": {
+    "개념확인형": {
+      "diagnosis": "닮음 조건(SSS·SAS·AA) 중 어떤 것을 적용해야 하는지 판정이 흔들리고, 합동 조건과 섞여 있어요.",
+      "improve": "주어진 조건이 변의 비인지 각인지 먼저 표시하고, 각이 두 개면 AA라는 가장 자주 쓰이는 경로부터 확인하세요.",
+      "advice": "닮음 문제의 대부분은 AA입니다. 같은 각 두 개를 먼저 찾으세요."
+    },
+    "계산형": {
+      "diagnosis": "닮음은 찾았지만 대응변의 순서를 맞추지 않아 비례식이 어긋나고 있어요.",
+      "improve": "△ABC∽△DEF로 쓸 때 A-D, B-E, C-F가 대응함을 이용해 비례식을 세로로 나란히 적는 연습을 하세요.",
+      "advice": "꼭짓점 순서를 맞춰 쓰는 것만으로 비례식 실수가 사라집니다."
+    },
+    "응용형": {
+      "diagnosis": "겹쳐 있거나 회전된 도형에서 닮은 두 삼각형을 분리해 보지 못하고 있어요.",
+      "improve": "닮은 두 삼각형을 따로 떼어 같은 방향으로 다시 그려보는 연습을 하세요. 넓이비는 길이비의 제곱임도 함께 정리하세요.",
+      "advice": "두 삼각형을 떼어 그리는 순간 대응이 보입니다."
+    },
+    "서술형": { "diagnosis": "닮음인 이유(어떤 조건인지)를 쓰지 않고 비례식만 세워 감점이 생겼어요.", "improve": "① 두 삼각형 ② 같은 각·변의 근거 ③ 닮음 조건 기호, 세 줄을 반드시 쓰세요.", "advice": "'∽(AA 닮음)'까지 써야 완결된 답안입니다." }
+  },
+  "right": {
+    "계산형": { "diagnosis": "닮음 조건과 대응 관계를 정확히 다루고 있어요.", "improve": "넓이비·부피비 문항으로 확장해 보세요.", "advice": "대응 순서를 잘 지킵니다." },
+    "응용형": { "diagnosis": "복잡한 그림에서도 닮은 삼각형을 정확히 분리해 내고 있어요.", "improve": "닮음과 피타고라스가 결합된 상위 문항에 도전해 보세요.", "advice": "도형 분리 감각이 좋습니다." }
+  }
+}
+};
+  for(var k in H1){ if(Object.prototype.hasOwnProperty.call(H1,k)) COMMENT_DB[k] = H1[k]; }
+})();
+
 // === 소단원 → 코멘트 매칭 함수 ===
 // =============================================
 
@@ -3786,6 +4244,17 @@ var GRADE_LIST = [
       {key:'고3-기하-1-4회',label:'4회'},{key:'고3-기하-1-5회',label:'5회'},{key:'고3-기하-1-6회',label:'6회'},
     ]},
   ]},
+  {key:'예비고1', label:'예비고1을 위한 고등학교 시험 미리보기', special:true, groups:[
+    {gkey:'예비고1-실전', glabel:'실전모의고사', exams:[
+      {key:'예비고1-실전-1회',label:'1회 중대부고'},{key:'예비고1-실전-2회',label:'2회 숙명여고'},{key:'예비고1-실전-3회',label:'3회 단대부고'},
+      {key:'예비고1-실전-4회',label:'4회 경기여고'},{key:'예비고1-실전-5회',label:'5회 중산고'},{key:'예비고1-실전-6회',label:'6회 중동고'},
+      {key:'예비고1-실전-7회',label:'7회 풍문고'},{key:'예비고1-실전-8회',label:'8회 은광여고'},{key:'예비고1-실전-9회',label:'9회 양재고'},
+      {key:'예비고1-실전-10회',label:'10회 언남고'},{key:'예비고1-실전-11회',label:'11회 영동일고'},{key:'예비고1-실전-12회',label:'12회 정신여고'},
+      {key:'예비고1-실전-13회',label:'13회 잠실여고'},{key:'예비고1-실전-14회',label:'14회 서울세종고'},{key:'예비고1-실전-15회',label:'15회 진선여고'},
+      {key:'예비고1-실전-16회',label:'16회 개포고'},{key:'예비고1-실전-17회',label:'17회 서초고'},{key:'예비고1-실전-18회',label:'18회 26년3월모의고사'},
+      {key:'예비고1-실전-19회',label:'19회 26년6월모의고사'},
+    ]},
+  ]},
 ];
 
 // 전체 시험키 → 라벨 맵 (groups 구조 기반)
@@ -3836,6 +4305,17 @@ function sortExamKeysByRound(keys){
     // 회차가 같으면 키 문자열 순
     return (''+a).localeCompare(''+b);
   });
+}
+
+// === 학생 조회 공통 헬퍼 (일반 학생 + 예비고1 학생 모두 검색) ===
+function findStudentAny(id){
+  if(!id) return null;
+  var s = (DB.students||[]).find(function(x){return x.id===id;});
+  if(s) return s;
+  return (DB.preStudents||[]).find(function(x){return x.id===id;}) || null;
+}
+function isPreStudent(id){
+  return !!(id && (DB.preStudents||[]).some(function(x){return x.id===id;}));
 }
 
 // === 응시현황 공통 헬퍼 ===
@@ -3966,7 +4446,8 @@ function isItemWrong(ans, i, q){
 var GRADE_KEY_MAP = {
   '초등 5학년':'초5','초등 6학년':'초6',
   '중학교 1학년':'중1','중학교 2학년':'중2','중학교 3학년':'중3',
-  '고등학교 1학년':'고1','고등학교 2학년':'고2','고등학교 3학년':'고3'
+  '고등학교 1학년':'고1','고등학교 2학년':'고2','고등학교 3학년':'고3',
+  '예비고1':'예비고1'
 };
 
 // 난이도 등급 매핑
@@ -3982,6 +4463,8 @@ var DB = {
   exams: {},     // {examKey: {total, date, memo, questions:[{major,unit,type,diff,comment}]}}
   scores: {},    // {studentId: {examKey: [true/false, ...]}}
   teachers: [],  // ["이도희","한덕수",...] 담당 선생님 명단
+  preStudents: [], // 예비고1 전용 학생 명단 (수동 입력, 기존 학생과 분리)
+  preExams: {},    // 예비고1 시험지 문항 구성 {examKey:{total,questions:[...]}}
 };
 
 function loadDB(){
@@ -3993,7 +4476,10 @@ function loadDB(){
     if(!DB.scores) DB.scores={};
     if(!DB.pdfFlags) DB.pdfFlags={};
     if(!DB.teachers) DB.teachers=[];
+    if(!DB.preStudents) DB.preStudents=[];
+    if(!DB.preExams) DB.preExams={};
   }catch(e){}
+  if(typeof applyPreExams==='function') applyPreExams();
   
   // ─── 기존 불필요한 시험지 정리 (안전 모드: 성적 있는 시험지는 절대 삭제 안 함) ───
   // 성적 데이터가 등록된 시험키 목록 수집
@@ -4021,7 +4507,8 @@ function loadDB(){
     '중1-2중-1회','중1-2중-2회','중1-2중-3회',
     '중1-2중-4회','중1-2중-5회','중1-2중-6회',
     '고2-미적-1-1회','고2-미적-1-2회','고2-미적-1-3회',
-    '고2-미적-1-4회','고2-미적-1-5회','고2-미적-1-6회'
+    '고2-미적-1-4회','고2-미적-1-5회','고2-미적-1-6회',
+    '예비고1-실전-1회','예비고1-실전-2회','예비고1-실전-3회','예비고1-실전-4회','예비고1-실전-5회','예비고1-실전-6회','예비고1-실전-7회','예비고1-실전-8회','예비고1-실전-9회','예비고1-실전-10회','예비고1-실전-11회','예비고1-실전-12회','예비고1-실전-13회','예비고1-실전-14회','예비고1-실전-15회','예비고1-실전-16회','예비고1-실전-17회','예비고1-실전-18회','예비고1-실전-19회'
   ];
 
   // ─── 중3-1중 1~6회: 안전하게만 정리 ───
@@ -5509,6 +5996,9 @@ function restoreData(event){
       DB.scores   = data.scores   || {};
       DB.teachers = data.teachers || [];
       DB.pdfFlags = data.pdfFlags || {};
+      DB.preStudents = data.preStudents || [];
+      DB.preExams   = data.preExams   || {};
+      if(typeof applyPreExams==='function') applyPreExams();
       saveDB();
       toast('복원 완료! ('+DB.students.length+'명, 시험지 '+Object.keys(DB.exams).length+'종)','ok',4000);
       setTimeout(function(){ location.reload(); }, 1500);
@@ -5540,6 +6030,8 @@ function cloudSave(){
       scores: DB.scores||{},
       pdfFlags: DB.pdfFlags||{},
       teachers: DB.teachers||[],
+      preStudents: DB.preStudents||[],
+      preExams: DB.preExams||{},
       _updatedBy: getCurrentUserLabel(),
       _updatedAt: Date.now()
     };
@@ -5552,7 +6044,8 @@ function cloudSave(){
   }, 600);
 }
 function updateBadges(){
-  document.getElementById('badgeStudents').textContent = '학생 '+DB.students.length+'명';
+  var preCnt = (DB.preStudents||[]).length;
+  document.getElementById('badgeStudents').textContent = '학생 '+DB.students.length+'명'+(preCnt?' · 예비고1 '+preCnt+'명':'');
   var cnt = Object.keys(DB.exams).length;
   document.getElementById('badgeExams').textContent = '시험지 '+cnt+'종 등록';
 }
@@ -6817,7 +7310,7 @@ function renderExamGroups(){
   });
 
   // 아코디언 목록
-  var icons={'초5':'📗','초6':'📘','중1':'📙','중2':'📕','중3':'📒','고1':'📓','고2':'📔'};
+  var icons={'초5':'📗','초6':'📘','중1':'📙','중2':'📕','중3':'📒','고1':'📓','고2':'📔','고3':'📗','예비고1':'🎓'};
   var html='';
   GRADE_LIST.forEach(function(g){
     var isOpen=openGradeKey===g.key;
@@ -6957,11 +7450,15 @@ function openExamUpload(key){
     stEl.style.cssText='background:rgba(245,158,11,.08);border:1.5px solid rgba(245,158,11,.25);border-radius:9px;padding:12px 14px;font-size:12px;font-weight:700;';
     stEl.innerHTML='⚠️ 분석 데이터 없음 — Claude.ai에서 시험지를 분석한 뒤 파일을 업데이트하세요 (PDF만 등록해도 인쇄는 가능합니다)';
   }
+  // 예비고1 전용 문항 구성 패널
+  if(typeof prePanelSync==='function') prePanelSync(key);
+
   document.getElementById('examUploadPanel').scrollIntoView({behavior:'smooth'});
 }
 
 function closeExamUpload(){
   document.getElementById('examUploadPanel').style.display='none';
+  var pb=document.getElementById('preExamSetup'); if(pb) pb.style.display='none';
   currentExamKey=null;
 }
 
@@ -6998,6 +7495,379 @@ function checkExamPdfStatus(examKey){
       icon.textContent  = '✅';
       label.textContent = 'PDF 등록됨 — 클릭하여 교체';
     }
+  });
+}
+
+
+// =====================================================================
+// === 예비고1을 위한 고등학교 시험 미리보기 (실전모의고사 1~19회) ===
+// ===   · 학생: 기존 학생과 분리된 수동 입력 명단 (DB.preStudents)
+// ===   · 시험지: 기존과 동일한 PDF 업로드 + 문항 구성 수동 설정
+// ===   · 채점: 기존과 동일한 수동(O/X·서술형 부분점수) 방식
+// ===   · 분석표: 기존 개인 분석/출력 엔진 그대로 사용
+// =====================================================================
+var PRE_GRADE_KEY = '예비고1';
+
+// 단원 선택 목록 (진단 코멘트 DB와 매칭되는 명칭 사용)
+var PRE_UNITS = {
+  '다항식': ['다항식의 연산','다항식의 곱셈·곱셈 공식','나머지정리·인수정리','인수분해'],
+  '방정식과 부등식': ['복소수와 그 연산','이차방정식의 판별식','이차방정식과 이차함수','고차방정식','연립방정식','연립일차부등식','이차부등식','절댓값 부등식'],
+  '경우의 수': ['경우의 수','순열','조합'],
+  '행렬': ['행렬의 뜻과 성분','행렬의 덧셈·상수배','행렬의 곱셈','행렬의 거듭제곱'],
+  '중학 대수(복습)': ['제곱근과 실수','인수분해 공식 ①','이차방정식과 그 해','이차함수 y=ax²의 그래프','이차함수의 최댓값과 최솟값'],
+  '중학 도형(복습)': ['피타고라스 정리','삼각비','원의 성질','도형의 닮음']
+};
+var PRE_DIFFS = ['하','중','상'];
+var PRE_TYPES = ['객관식','서술형'];
+
+function isPreExamKey(key){ return !!key && key.indexOf('예비고1-') === 0; }
+
+// DB.preExams(클라우드 공유) → DB.exams 로 반영
+function applyPreExams(){
+  if(!DB.preExams) DB.preExams = {};
+  Object.keys(DB.preExams).forEach(function(k){
+    var c = DB.preExams[k];
+    if(c && c.questions && c.questions.length){ DB.exams[k] = c; }
+  });
+}
+
+// =============================================
+// === 예비고1 학생 명단 (수동 입력) ===
+// =============================================
+var _preEditingId = null;
+
+function openPreStudents(){
+  _preEditingId = null;
+  document.getElementById('preSName').value = '';
+  document.getElementById('preSSchool').value = '';
+  document.getElementById('preSMemo').value = '';
+  document.getElementById('preSSaveBtn').textContent = '＋ 추가';
+  document.getElementById('preSCancelBtn').style.display = 'none';
+  renderPreStudents();
+  document.getElementById('preStudentModal').classList.add('open');
+  setTimeout(function(){ var el=document.getElementById('preSName'); if(el) el.focus(); }, 100);
+}
+function closePreStudents(){
+  document.getElementById('preStudentModal').classList.remove('open');
+  // 열려 있는 화면 갱신
+  if(typeof fillScoreTeacher==='function') fillScoreTeacher();
+  if(typeof fillScoreStudents==='function') fillScoreStudents();
+  if(typeof fillAnaTeacher==='function') fillAnaTeacher();
+  if(typeof fillAnaStudents==='function') fillAnaStudents();
+}
+
+function renderPreStudents(){
+  var tb = document.getElementById('preStudentBody');
+  if(!tb) return;
+  var list = (DB.preStudents||[]).slice().sort(function(a,b){
+    return (a.name||'').localeCompare(b.name||'','ko');
+  });
+  if(!list.length){
+    tb.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--mu);padding:26px 0;font-size:12px;">'
+      + '등록된 예비고1 학생이 없습니다. 위에서 이름을 입력하고 ＋추가를 누르세요.</td></tr>';
+  } else {
+    var html = '';
+    list.forEach(function(s, i){
+      var cnt = Object.keys((DB.scores||{})[s.id]||{}).filter(function(k){return isPreExamKey(k);}).length;
+      html += '<tr>'
+        + '<td style="text-align:center;color:var(--mu);">'+(i+1)+'</td>'
+        + '<td style="font-weight:800;">'+escHtml(s.name||'')+'</td>'
+        + '<td>'+escHtml(s.school||'')+'</td>'
+        + '<td style="color:var(--mu);">'+escHtml(s.memo||'')+'</td>'
+        + '<td style="text-align:center;font-weight:800;color:'+(cnt?'var(--ok)':'var(--mu)')+';">'+(cnt?cnt+'회':'-')+'</td>'
+        + '<td style="text-align:center;white-space:nowrap;">'
+        + '<button class="btn btn-mu btn-sm" style="padding:3px 8px;font-size:10px;" onclick="editPreStudent(\'' + s.id + '\')">수정</button> '
+        + '<button class="btn btn-sm" style="padding:3px 8px;font-size:10px;background:var(--nl);color:var(--ng);border:1.5px solid var(--ng);" onclick="deletePreStudent(\'' + s.id + '\')">삭제</button>'
+        + '</td></tr>';
+    });
+    tb.innerHTML = html;
+  }
+  var c = document.getElementById('preStudentCount');
+  if(c) c.textContent = '총 ' + list.length + '명 등록';
+}
+
+function savePreStudent(){
+  var name   = (document.getElementById('preSName').value||'').trim();
+  var school = (document.getElementById('preSSchool').value||'').trim();
+  var memo   = (document.getElementById('preSMemo').value||'').trim();
+  if(!name){ toast('이름을 입력해주세요','ng'); return; }
+  if(!DB.preStudents) DB.preStudents = [];
+
+  if(_preEditingId){
+    var idx = DB.preStudents.findIndex(function(x){return x.id===_preEditingId;});
+    if(idx>=0){
+      DB.preStudents[idx].name   = name;
+      DB.preStudents[idx].school = school;
+      DB.preStudents[idx].memo   = memo;
+    }
+    _preEditingId = null;
+    document.getElementById('preSSaveBtn').textContent = '＋ 추가';
+    document.getElementById('preSCancelBtn').style.display = 'none';
+    toast('수정되었습니다 ✓','ok');
+  } else {
+    var dup = DB.preStudents.some(function(x){ return x.name===name && (x.school||'')===school; });
+    if(dup){ toast('같은 이름·학교의 학생이 이미 있습니다','ng'); return; }
+    DB.preStudents.push({
+      id: 'pre_' + genId(),
+      name: name, school: school, memo: memo,
+      grade: PRE_GRADE_KEY, pre: true
+    });
+    toast(name + ' 학생이 추가되었습니다 ✓','ok');
+  }
+  saveDB();
+  document.getElementById('preSName').value = '';
+  document.getElementById('preSSchool').value = '';
+  document.getElementById('preSMemo').value = '';
+  document.getElementById('preSName').focus();
+  renderPreStudents();
+}
+
+function editPreStudent(id){
+  var s = (DB.preStudents||[]).find(function(x){return x.id===id;});
+  if(!s) return;
+  _preEditingId = id;
+  document.getElementById('preSName').value   = s.name||'';
+  document.getElementById('preSSchool').value = s.school||'';
+  document.getElementById('preSMemo').value   = s.memo||'';
+  document.getElementById('preSSaveBtn').textContent = '💾 저장';
+  document.getElementById('preSCancelBtn').style.display = '';
+  document.getElementById('preSName').focus();
+}
+function preCancelEdit(){
+  _preEditingId = null;
+  document.getElementById('preSName').value = '';
+  document.getElementById('preSSchool').value = '';
+  document.getElementById('preSMemo').value = '';
+  document.getElementById('preSSaveBtn').textContent = '＋ 추가';
+  document.getElementById('preSCancelBtn').style.display = 'none';
+}
+
+function deletePreStudent(id){
+  var s = (DB.preStudents||[]).find(function(x){return x.id===id;});
+  if(!s) return;
+  var cnt = Object.keys((DB.scores||{})[id]||{}).length;
+  showConfirm(s.name + ' 학생을 명단에서 삭제합니까?' + (cnt?'\n입력된 성적 '+cnt+'건도 함께 삭제됩니다.':''), '🗑️ 삭제', function(ok){
+    if(!ok) return;
+    DB.preStudents = DB.preStudents.filter(function(x){return x.id!==id;});
+    if(DB.scores && DB.scores[id]) delete DB.scores[id];
+    saveDB();
+    renderPreStudents();
+    toast('삭제되었습니다','wn');
+  });
+}
+
+// =============================================
+// === 예비고1 시험지 문항 구성 ===
+// =============================================
+var _preRows = [];
+
+// 시험지 업로드 패널이 열릴 때 호출 (openExamUpload 끝에서 연결)
+function prePanelSync(key){
+  var box = document.getElementById('preExamSetup');
+  if(!box) return;
+  if(!isPreExamKey(key)){ box.style.display='none'; return; }
+  box.style.display = 'block';
+  preFillBulkMajor();
+  preLoadExam(true);
+}
+
+function preFillBulkMajor(){
+  var m = document.getElementById('preBulkMajor');
+  if(!m || m.options.length) {} // 매번 새로 채움
+  if(!m) return;
+  m.innerHTML = '';
+  Object.keys(PRE_UNITS).forEach(function(k){
+    m.innerHTML += '<option value="'+escHtml(k)+'">'+escHtml(k)+'</option>';
+  });
+  preFillBulkUnits();
+}
+function preFillBulkUnits(){
+  var m = document.getElementById('preBulkMajor');
+  var u = document.getElementById('preBulkUnit');
+  if(!m||!u) return;
+  u.innerHTML = '';
+  (PRE_UNITS[m.value]||[]).forEach(function(x){
+    u.innerHTML += '<option value="'+escHtml(x)+'">'+escHtml(x)+'</option>';
+  });
+}
+
+function _preUnitOptions(major, unit){
+  var majors = Object.keys(PRE_UNITS);
+  var mh = '';
+  majors.forEach(function(k){
+    mh += '<option value="'+escHtml(k)+'"'+(k===major?' selected':'')+'>'+escHtml(k)+'</option>';
+  });
+  var units = PRE_UNITS[major] || PRE_UNITS[majors[0]];
+  var uh = '';
+  units.forEach(function(x){
+    uh += '<option value="'+escHtml(x)+'"'+(x===unit?' selected':'')+'>'+escHtml(x)+'</option>';
+  });
+  return {m:mh, u:uh};
+}
+
+function preRenderRows(){
+  var tb = document.getElementById('preQBody');
+  if(!tb) return;
+  var html = '';
+  _preRows.forEach(function(q, i){
+    var o = _preUnitOptions(q.major, q.unit);
+    html += '<tr>'
+      + '<td style="text-align:center;font-weight:800;color:var(--pr);">'+(i+1)+'</td>'
+      + '<td><input type="number" step="0.1" min="0" value="'+q.points+'" data-pi="'+i+'" data-pf="points" oninput="preRowChange(this)" style="width:58px;padding:3px 5px;font-size:11px;border:1px solid var(--bd);border-radius:5px;text-align:center;"></td>'
+      + '<td><select data-pi="'+i+'" data-pf="type" onchange="preRowChange(this)" style="width:80px;padding:3px 4px;font-size:11px;border:1px solid var(--bd);border-radius:5px;">'
+      +   PRE_TYPES.map(function(t){return '<option'+(t===q.type?' selected':'')+'>'+t+'</option>';}).join('')
+      + '</select></td>'
+      + '<td><select data-pi="'+i+'" data-pf="diff" onchange="preRowChange(this)" style="width:66px;padding:3px 4px;font-size:11px;border:1px solid var(--bd);border-radius:5px;">'
+      +   PRE_DIFFS.map(function(d){return '<option'+(d===q.diff?' selected':'')+'>'+d+'</option>';}).join('')
+      + '</select></td>'
+      + '<td><select data-pi="'+i+'" data-pf="major" onchange="preRowChange(this)" style="width:100%;padding:3px 4px;font-size:11px;border:1px solid var(--bd);border-radius:5px;">'+o.m+'</select></td>'
+      + '<td><select data-pi="'+i+'" data-pf="unit" onchange="preRowChange(this)" style="width:100%;padding:3px 4px;font-size:11px;border:1px solid var(--bd);border-radius:5px;">'+o.u+'</select></td>'
+      + '<td><input type="text" value="'+escHtml(q.comment||'')+'" data-pi="'+i+'" data-pf="comment" oninput="preRowChange(this)" placeholder="예) 나머지정리로 a 구하기" style="width:100%;padding:3px 6px;font-size:11px;border:1px solid var(--bd);border-radius:5px;"></td>'
+      + '</tr>';
+  });
+  tb.innerHTML = html || '<tr><td colspan="7" style="text-align:center;color:var(--mu);padding:22px 0;font-size:12px;">위에서 문항 수를 입력하고 ⚙️ 빠른 생성을 누르세요.</td></tr>';
+  preUpdateTotal();
+}
+
+function preRowChange(el){
+  var i = parseInt(el.getAttribute('data-pi'),10);
+  var f = el.getAttribute('data-pf');
+  if(isNaN(i) || !_preRows[i]) return;
+  if(f==='points'){
+    _preRows[i].points = Math.max(0, parseFloat(el.value)||0);
+    preUpdateTotal();
+  } else if(f==='major'){
+    _preRows[i].major = el.value;
+    var us = (PRE_UNITS[el.value]||[]);
+    _preRows[i].unit = us[0]||'';
+    preRenderRows();
+  } else {
+    _preRows[i][f] = el.value;
+  }
+}
+
+function preUpdateTotal(){
+  var el = document.getElementById('preTotalPts');
+  if(!el) return;
+  var sum = _preRows.reduce(function(a,q){ return a + (parseFloat(q.points)||0); },0);
+  sum = Math.round(sum*10)/10;
+  el.innerHTML = '총 ' + _preRows.length + '문항 · 합계 <span style="color:'+(sum===100?'var(--ok)':'var(--wn)')+';">'+sum+'점</span>'
+    + (sum===100?' ✓':'');
+}
+
+function preBuildRows(){
+  var n  = parseInt(document.getElementById('preQCount').value,10)||0;
+  var mp = parseFloat(document.getElementById('preQmPoint').value)||4;
+  var ec = parseInt(document.getElementById('preQeCount').value,10)||0;
+  var ep = parseFloat(document.getElementById('preQePoint').value)||6;
+  if(n<1){ toast('문항 수를 입력해주세요','ng'); return; }
+  if(ec>n){ toast('서술형 문항 수가 전체 문항 수보다 많습니다','ng'); return; }
+  var firstMajor = Object.keys(PRE_UNITS)[0];
+  var firstUnit  = PRE_UNITS[firstMajor][0];
+  var old = _preRows.slice();
+  _preRows = [];
+  for(var i=0;i<n;i++){
+    var isEssay = (i >= n-ec);
+    var prev = old[i];
+    _preRows.push({
+      num: i+1,
+      points: isEssay ? ep : mp,
+      type:  isEssay ? '서술형' : '객관식',
+      diff:  prev ? prev.diff : '중',
+      major: prev ? prev.major : firstMajor,
+      unit:  prev ? prev.unit  : firstUnit,
+      comment: prev ? (prev.comment||'') : ''
+    });
+  }
+  preRenderRows();
+  toast(n+'문항 틀을 만들었습니다. 단원·난이도를 확인하세요','ok');
+}
+
+function preApplyBulkUnit(){
+  if(!_preRows.length){ toast('먼저 문항 틀을 생성하세요','ng'); return; }
+  var m = document.getElementById('preBulkMajor').value;
+  var u = document.getElementById('preBulkUnit').value;
+  _preRows.forEach(function(q){ q.major=m; q.unit=u; });
+  preRenderRows();
+  toast('전체 문항에 적용했습니다','ok');
+}
+function preApplyBulkDiff(d){
+  if(!_preRows.length){ toast('먼저 문항 틀을 생성하세요','ng'); return; }
+  _preRows.forEach(function(q){ q.diff=d; });
+  preRenderRows();
+  toast('난이도를 '+d+'로 일괄 적용했습니다','ok');
+}
+
+function preLoadExam(silent){
+  if(!currentExamKey || !isPreExamKey(currentExamKey)) return;
+  var cfg = (DB.preExams && DB.preExams[currentExamKey]) || DB.exams[currentExamKey];
+  if(cfg && cfg.questions && cfg.questions.length){
+    _preRows = cfg.questions.map(function(q,i){
+      return {
+        num: i+1,
+        points: q.points||4,
+        type: q.type||'객관식',
+        diff: q.diff||'중',
+        major: q.major || Object.keys(PRE_UNITS)[0],
+        unit: q.unit || PRE_UNITS[Object.keys(PRE_UNITS)[0]][0],
+        comment: q.comment||''
+      };
+    });
+    document.getElementById('preQCount').value = _preRows.length;
+    var ess = _preRows.filter(function(q){return q.type==='서술형';});
+    document.getElementById('preQeCount').value = ess.length;
+    var mcs = _preRows.filter(function(q){return q.type!=='서술형';});
+    if(mcs.length) document.getElementById('preQmPoint').value = mcs[0].points;
+    if(ess.length) document.getElementById('preQePoint').value = ess[0].points;
+    if(!silent) toast('저장된 문항 구성을 불러왔습니다','ok');
+  } else {
+    _preRows = [];
+    if(!silent) toast('저장된 문항 구성이 없습니다','wn');
+  }
+  preRenderRows();
+}
+
+function preSaveExam(){
+  if(!currentExamKey || !isPreExamKey(currentExamKey)){ toast('시험지를 먼저 선택하세요','ng'); return; }
+  if(!_preRows.length){ toast('문항 틀을 먼저 생성하세요','ng'); return; }
+  var cfg = {
+    total: _preRows.length,
+    memo: EXAM_LABEL[currentExamKey] || currentExamKey,
+    questions: _preRows.map(function(q,i){
+      return {
+        num: i+1,
+        points: Math.round((parseFloat(q.points)||0)*10)/10,
+        major: q.major,
+        unit: q.unit,
+        type: q.type,
+        diff: q.diff,
+        comment: q.comment || (EXAM_LABEL[currentExamKey]||'') + ' ' + (i+1) + '번'
+      };
+    })
+  };
+  if(!DB.preExams) DB.preExams = {};
+  DB.preExams[currentExamKey] = cfg;
+  DB.exams[currentExamKey] = cfg;
+  saveDB();
+  renderExamGroups();
+  openExamUpload(currentExamKey);
+  toast('문항 구성이 저장되었습니다 ✓ (' + cfg.total + '문항)','ok');
+}
+
+function preClearExam(){
+  if(!currentExamKey || !isPreExamKey(currentExamKey)) return;
+  showConfirm('이 시험지의 문항 구성을 삭제합니까?\n(PDF는 유지되며, 입력된 성적도 함께 삭제됩니다)', '🗑️ 삭제', function(ok){
+    if(!ok) return;
+    if(DB.preExams) delete DB.preExams[currentExamKey];
+    delete DB.exams[currentExamKey];
+    Object.keys(DB.scores||{}).forEach(function(sid){
+      if(DB.scores[sid]) delete DB.scores[sid][currentExamKey];
+    });
+    saveDB();
+    _preRows = [];
+    preRenderRows();
+    renderExamGroups();
+    toast('문항 구성을 삭제했습니다','wn');
   });
 }
 
@@ -7089,6 +7959,16 @@ function _fillPrintStudents(){
   var ps = document.getElementById('printStudent');
   if(!ps) return;
   ps.innerHTML='<option value="">학생을 선택하세요</option>';
+  if(teacher==='__pre__' || gradeKey==='예비고1'){
+    (DB.preStudents||[]).slice().sort(function(a,b){return (a.name||'').localeCompare(b.name||'','ko');})
+      .forEach(function(s){
+        ps.innerHTML+='<option value="'+s.id+'">'+escHtml(s.name)+(s.school?' ('+escHtml(s.school)+')':'')+'</option>';
+      });
+    var box0=document.getElementById('printExamList'); if(box0) box0.innerHTML='학생을 먼저 선택하세요';
+    var ctrl0=document.getElementById('printExamControls'); if(ctrl0) ctrl0.style.display='none';
+    _printSelectedExams={};
+    return;
+  }
   DB.students.filter(function(s){
     var tMatch = !teacher || s.teacher===teacher;
     var gMatch = !gradeKey || GRADE_KEY_MAP[s.grade]===gradeKey;
@@ -7519,6 +8399,26 @@ function _bulkKeyTokens(gradeKey, gkey){
 // 파일명 → 시험키 추정 (실패 시 null)
 function guessExamKeyFromFilename(fileName){
   var s = _bulkNorm(fileName);
+
+  // ── 예비고1 실전모의고사 우선 매칭 (학교명 또는 '실전/예비고1' + 회차) ──
+  var preG = GRADE_LIST.find(function(g){return g.key==='예비고1';});
+  if(preG){
+    var preExams = preG.groups[0].exams;
+    // (1) 학교명/식별어로 직접 매칭
+    for(var i=0;i<preExams.length;i++){
+      var tag = _bulkNorm(String(preExams[i].label).replace(/^\d+회\s*/,''));
+      if(tag && tag.length>=3 && s.indexOf(tag)>=0) return preExams[i].key;
+    }
+    // (2) '실전모의고사N회' / '예비고1 N회' 형태
+    if(/실전|예비고1|예비고사/.test(s)){
+      var prm = s.match(/(\d+)\s*회/);
+      if(prm){
+        var n = parseInt(prm[1],10);
+        if(n>=1 && n<=preExams.length) return '예비고1-실전-'+n+'회';
+      }
+    }
+  }
+
   var rm = s.match(/(\d+)\s*회/);
   if(!rm) return null;                 // 회차를 못 찾으면 자동 매칭 포기
 
@@ -7922,11 +8822,7 @@ function initScoreTab(){
   fillScoreStudents();
 
   // 학년 드롭다운
-  var sg = document.getElementById('scoreGradeFilter');
-  sg.innerHTML = '<option value="">학년 선택</option>';
-  GRADE_LIST.forEach(function(g){
-    sg.innerHTML += '<option value="'+g.key+'">'+g.label+'</option>';
-  });
+  fillScoreGradeSelect(window._scoreTeacher==='__pre__');
 
   // 시험지 초기화
   document.getElementById('scoreExam').innerHTML = '<option value="">시험지를 선택하세요</option>';
@@ -7945,13 +8841,14 @@ function fillScoreTeacher(){
   var myName = getMyTeacherName();
   if(DB.teachers) DB.teachers.sort(function(a,b){return a.localeCompare(b,'ko');});
 
+  var preOpt = '<option value="__pre__">🎓 예비고1 모의고사 ('+((DB.preStudents||[]).length)+'명)</option>';
   if(myName){
-    // 일반 선생님: 본인 고정
+    // 일반 선생님: 본인 고정 (+ 예비고1 모드는 공통 사용)
     var myCnt = DB.students.filter(function(s){return s.teacher===myName;}).length;
-    sel.innerHTML = '<option value="'+escHtml(myName)+'">'+escHtml(myName)+' 선생님 ('+myCnt+'명)</option>';
-    sel.value = myName;
-    sel.disabled = true;
-    window._scoreTeacher = myName;
+    sel.innerHTML = '<option value="'+escHtml(myName)+'">'+escHtml(myName)+' 선생님 ('+myCnt+'명)</option>' + preOpt;
+    sel.disabled = false;
+    if(window._scoreTeacher!=='__pre__') window._scoreTeacher = myName;
+    sel.value = window._scoreTeacher;
   } else {
     // 관리자: 전체 선택 가능
     sel.disabled = false;
@@ -7963,6 +8860,7 @@ function fillScoreTeacher(){
     });
     var noneCnt = DB.students.filter(function(s){return !s.teacher||(DB.teachers||[]).indexOf(s.teacher)<0;}).length;
     if(noneCnt>0) html += '<option value="__none__">❓ 담당 미지정 ('+noneCnt+'명)</option>';
+    html += preOpt;
     sel.innerHTML = html;
     // 관리자는 기본 '전체 학생'
     if(!window._scoreTeacher) window._scoreTeacher = '__all__';
@@ -7970,12 +8868,37 @@ function fillScoreTeacher(){
   }
 }
 
+// 학년 드롭다운 채우기 (예비고1 모드면 예비고1만, 아니면 일반 학년만)
+function fillScoreGradeSelect(isPre){
+  var sg = document.getElementById('scoreGradeFilter');
+  if(!sg) return;
+  sg.innerHTML = '<option value="">학년 선택</option>';
+  GRADE_LIST.forEach(function(g){
+    if(isPre ? (g.key==='예비고1') : (g.key!=='예비고1')){
+      sg.innerHTML += '<option value="'+g.key+'">'+g.label+'</option>';
+    }
+  });
+  if(isPre) sg.value='예비고1';
+}
+
 // 선생님 선택에 따라 학생 드롭다운 채우기
 function fillScoreStudents(){
   var ss = document.getElementById('scoreStudent');
   if(!ss) return;
   var myName = getMyTeacherName();
-  var pick = myName ? myName : (window._scoreTeacher || '__all__');
+  var pick = (window._scoreTeacher==='__pre__') ? '__pre__' : (myName ? myName : (window._scoreTeacher || '__all__'));
+
+  // 예비고1 모드: 별도 명단에서만 선택
+  if(pick==='__pre__'){
+    var pl = (DB.preStudents||[]).slice().sort(function(a,b){return (a.name||'').localeCompare(b.name||'','ko');});
+    ss.innerHTML = '<option value="">학생을 선택하세요 ('+pl.length+'명)</option>';
+    pl.forEach(function(s){
+      ss.innerHTML += '<option value="'+s.id+'">'+escHtml(s.name)+(s.school?' ('+escHtml(s.school)+')':'')+'</option>';
+    });
+    var pb=document.getElementById('preStudentManageBar'); if(pb) pb.style.display='flex';
+    return;
+  }
+  var pb0=document.getElementById('preStudentManageBar'); if(pb0) pb0.style.display='none';
 
   var list = DB.students.filter(function(s){
     if(pick==='__all__') return true;
@@ -7999,9 +8922,10 @@ function fillScoreStudents(){
 function onScoreTeacherChange(){
   window._scoreTeacher = document.getElementById('scoreTeacher').value || '__all__';
   fillScoreStudents();
+  fillScoreGradeSelect(window._scoreTeacher==='__pre__');
   // 선택 초기화
   document.getElementById('scoreStudent').value = '';
-  document.getElementById('scoreGradeFilter').value = '';
+  if(window._scoreTeacher!=='__pre__') document.getElementById('scoreGradeFilter').value = '';
   document.getElementById('scoreExam').innerHTML = '<option value="">시험지를 선택하세요</option>';
   document.getElementById('scorePanel').style.display = 'none';
   document.getElementById('scoreEmpty').style.display = 'block';
@@ -8019,9 +8943,10 @@ function onScoreStudentChange(){
 
   // 학생 선택 시 해당 학년으로 필터 자동 세팅
   if(currentScoreStudentId){
-    var s = DB.students.find(function(x){return x.id===currentScoreStudentId;});
+    var s = findStudentAny(currentScoreStudentId);
     if(s){
-      var gk = GRADE_KEY_MAP[s.grade] || '';
+      var gk = isPreStudent(currentScoreStudentId) ? '예비고1' : (GRADE_KEY_MAP[s.grade] || '');
+      fillScoreGradeSelect(isPreStudent(currentScoreStudentId));
       document.getElementById('scoreGradeFilter').value = gk;
       buildScoreExamList(gk);
     }
@@ -8043,6 +8968,25 @@ function buildScoreExamList(gradeKey){
   var sel = document.getElementById('scoreExam');
   sel.innerHTML = '<option value="">시험지를 선택하세요</option>';
   if(!gradeKey) return;
+
+  // ── 예비고1: 실전모의고사 19회차만 표시 ──
+  if(gradeKey==='예비고1'){
+    var pg = GRADE_LIST.find(function(g){return g.key==='예비고1';});
+    if(!pg) return;
+    var any=false;
+    pg.groups.forEach(function(grp){
+      grp.exams.forEach(function(e){
+        if(DB.exams[e.key]){
+          any=true;
+          sel.innerHTML += '<option value="'+e.key+'">'+escHtml(grp.glabel+' '+e.label)+'</option>';
+        }
+      });
+    });
+    if(!any){
+      sel.innerHTML = '<option value="">문항 구성이 등록된 시험지가 없습니다 (② 시험지 관리에서 설정)</option>';
+    }
+    return;
+  }
   
   // 선택한 학년과 그 이후 학년의 모든 시험지 추가
   var selectedIndex = GRADE_ORDER.indexOf(gradeKey);
@@ -8086,7 +9030,7 @@ function _ansBadge(q){
 }
 
 function renderScoreSheet(){
-  var s  = DB.students.find(function(x){return x.id===currentScoreStudentId;});
+  var s  = findStudentAny(currentScoreStudentId);
   var ex = DB.exams[currentScoreExamKey];
   if(!s||!ex){
     document.getElementById('scorePanel').style.display = 'none';
@@ -8263,12 +9207,13 @@ function fillAnaTeacher(){
   var myName = getMyTeacherName();
   if(DB.teachers) DB.teachers.sort(function(a,b){return a.localeCompare(b,'ko');});
 
+  var preOptA = '<option value="__pre__">🎓 예비고1 모의고사 ('+((DB.preStudents||[]).length)+'명)</option>';
   if(myName){
     var myCnt = DB.students.filter(function(s){return s.teacher===myName;}).length;
-    sel.innerHTML = '<option value="'+escHtml(myName)+'">'+escHtml(myName)+' 선생님 ('+myCnt+'명)</option>';
-    sel.value = myName;
-    sel.disabled = true;
-    window._anaTeacher = myName;
+    sel.innerHTML = '<option value="'+escHtml(myName)+'">'+escHtml(myName)+' 선생님 ('+myCnt+'명)</option>' + preOptA;
+    sel.disabled = false;
+    if(window._anaTeacher!=='__pre__') window._anaTeacher = myName;
+    sel.value = window._anaTeacher;
   } else {
     sel.disabled = false;
     var html = '<option value="">👨‍🏫 선생님 선택</option>';
@@ -8279,6 +9224,7 @@ function fillAnaTeacher(){
     });
     var noneCnt = DB.students.filter(function(s){return !s.teacher||(DB.teachers||[]).indexOf(s.teacher)<0;}).length;
     if(noneCnt>0) html += '<option value="__none__">❓ 담당 미지정 ('+noneCnt+'명)</option>';
+    html += preOptA;
     sel.innerHTML = html;
     if(!window._anaTeacher) window._anaTeacher = '__all__';
     sel.value = window._anaTeacher;
@@ -8290,7 +9236,16 @@ function fillAnaStudents(){
   var sel = document.getElementById('anaStudent');
   if(!sel) return;
   var myName = getMyTeacherName();
-  var pick = myName ? myName : (window._anaTeacher || '__all__');
+  var pick = (window._anaTeacher==='__pre__') ? '__pre__' : (myName ? myName : (window._anaTeacher || '__all__'));
+
+  if(pick==='__pre__'){
+    var pl = (DB.preStudents||[]).slice().sort(function(a,b){return (a.name||'').localeCompare(b.name||'','ko');});
+    sel.innerHTML = '<option value="">학생 선택 ('+pl.length+'명)</option>';
+    pl.forEach(function(s){
+      sel.innerHTML += '<option value="'+s.id+'">'+escHtml(s.name)+(s.school?' ('+escHtml(s.school)+')':'')+'</option>';
+    });
+    return;
+  }
 
   var list = DB.students.filter(function(s){
     if(pick==='__all__') return true;
@@ -8422,7 +9377,7 @@ function runPersonalAnalysis(){
     return;
   }
   
-  var s = DB.students.find(function(x){return x.id===sid;});
+  var s = findStudentAny(sid);
   if(!s) return;
 
   // 해당 학생의 시험 목록
@@ -9221,8 +10176,9 @@ function doPrintPersonal(){
 
   // 1) 개인 분석 화면(S4)에 학생/시험 설정
   // 선생님 드롭다운(권한)도 맞춰줌
-  var st = DB.students.find(function(x){return x.id===sid;});
-  if(st && st.teacher){
+  var st = findStudentAny(sid);
+  if(isPreStudent(sid)){ window._anaTeacher = '__pre__'; }
+  else if(st && st.teacher){
     window._anaTeacher = getMyTeacherName() ? getMyTeacherName() : st.teacher;
   }
   if(typeof fillAnaTeacher==='function') fillAnaTeacher();
@@ -9356,7 +10312,7 @@ function captureAnalysisCharts(){
 }
 
 function printPersonalInNewWindow(sid, examKeys, chartImages, returnHtmlOnly){
-  var s = DB.students.find(function(x){return x.id===sid;});
+  var s = findStudentAny(sid);
   if(!s){ toast('학생 정보를 찾을 수 없습니다','ng'); return; }
 
   var allScores = DB.scores[sid]||{};
@@ -11197,6 +12153,8 @@ function enterAppAsTeacher(){
       if(local.scores) DB.scores=local.scores;
       if(local.pdfFlags) DB.pdfFlags=local.pdfFlags;
       if(local.teachers) DB.teachers=local.teachers;
+      if(local.preStudents) DB.preStudents=local.preStudents;
+      if(local.preExams) DB.preExams=local.preExams;
     }
   }catch(e){}
   try{ if(typeof startAppAfterLogin==='function') startAppAfterLogin(); }catch(e3){ console.error('화면 그리기 오류:',e3); }
@@ -11222,6 +12180,9 @@ function startCloudSync(){
       DB.scores   = data.scores   || {};
       DB.pdfFlags = data.pdfFlags || {};
       DB.teachers = data.teachers || [];
+      DB.preStudents = data.preStudents || [];
+      DB.preExams   = data.preExams   || {};
+      if(typeof applyPreExams==='function') applyPreExams();
       try{ localStorage.setItem('highone_db', JSON.stringify(DB)); }catch(e){}
       _applyingRemote=false;
 
